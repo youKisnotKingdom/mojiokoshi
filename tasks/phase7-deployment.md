@@ -1,7 +1,12 @@
 # Phase 7: Docker化・デプロイ
 
 ## 目標
-本番環境向けのコンテナ化と構成
+オンプレミス環境向けのコンテナ化と構成
+
+## 前提
+- インターネット接続なしのオンプレミス環境で動作
+- Dockerイメージは事前にビルドし、オフライン環境にインポート
+- LLMサーバーはローカルネットワーク内の別サーバー
 
 ## タスク一覧
 
@@ -20,7 +25,24 @@
 - [ ] Whisper/qwen-asr インストール
 - [ ] cuDNN設定
 
-### 7.3 Docker Compose構成
+### 7.3 オフラインビルド対応
+- [ ] 依存パッケージのダウンロード（requirements.txt）
+  ```bash
+  pip download -r requirements.txt -d ./packages
+  ```
+- [ ] Dockerfile でローカルパッケージからインストール
+- [ ] Whisper/faster-whisper モデルの事前ダウンロード
+- [ ] Dockerイメージのエクスポート手順
+  ```bash
+  docker save mojiokoshi:latest | gzip > mojiokoshi.tar.gz
+  ```
+- [ ] Dockerイメージのインポート手順
+  ```bash
+  docker load < mojiokoshi.tar.gz
+  ```
+- [ ] オフラインデプロイ用スクリプト作成
+
+### 7.4 Docker Compose構成
 - [ ] `docker-compose.yml` 作成（本番用）
 - [ ] サービス定義
   - `app`: FastAPIアプリケーション
@@ -30,13 +52,13 @@
   - `redis`: Redis（タスクキュー）
   - `nginx`: リバースプロキシ（オプション）
 
-### 7.4 GPU設定
+### 7.5 GPU設定
 - [ ] NVIDIA Container Toolkit 対応設定
 - [ ] docker-compose での GPU割り当て
 - [ ] GPU メモリ制限設定
 - [ ] 複数GPU対応（オプション）
 
-### 7.5 環境変数・シークレット管理
+### 7.6 環境変数・シークレット管理
 - [ ] `.env.example` 作成
 - [ ] `.env.production` テンプレート
 - [ ] Docker secrets 対応（オプション）
@@ -51,10 +73,11 @@
   # Security
   SECRET_KEY
 
-  # LLM API
-  LLM_API_BASE_URL
-  LLM_API_KEY
-  LLM_MODEL_NAME
+  # LLM API（ローカルネットワーク内サーバー）
+  LLM_API_BASE_URL=http://192.168.x.x:8000/v1
+  LLM_API_KEY=             # 不要な場合は空
+  LLM_MODEL_NAME=mistral-7b
+  LLM_TIMEOUT=120
 
   # Storage
   UPLOAD_DIR
@@ -63,18 +86,18 @@
   AUDIO_RETENTION_DAYS
   ```
 
-### 7.6 ボリューム設定
+### 7.7 ボリューム設定
 - [ ] PostgreSQLデータ永続化
 - [ ] Redisデータ永続化
 - [ ] アップロードファイル永続化
 - [ ] ログファイル永続化
 
-### 7.7 ネットワーク設定
+### 7.8 ネットワーク設定
 - [ ] 内部ネットワーク定義
 - [ ] 外部公開ポート設定
 - [ ] サービス間通信設定
 
-### 7.8 Nginx設定（オプション）
+### 7.9 Nginx設定（オプション）
 - [ ] `docker/nginx/nginx.conf` 作成
 - [ ] リバースプロキシ設定
 - [ ] 静的ファイル配信
@@ -82,39 +105,40 @@
 - [ ] タイムアウト設定
 - [ ] SSL/TLS設定（オプション）
 
-### 7.9 ヘルスチェック設定
+### 7.10 ヘルスチェック設定
 - [ ] FastAPI ヘルスチェックエンドポイント
 - [ ] PostgreSQL 接続チェック
 - [ ] Redis 接続チェック
 - [ ] Worker ステータスチェック
 - [ ] Docker HEALTHCHECK 設定
 
-### 7.10 ログ設定
+### 7.11 ログ設定
 - [ ] アプリケーションログ設定
 - [ ] JSON形式ログ出力
 - [ ] ログローテーション
 - [ ] ログレベル設定
 
-### 7.11 起動スクリプト
+### 7.12 起動スクリプト
 - [ ] `scripts/start.sh` - アプリケーション起動
 - [ ] `scripts/start-worker.sh` - ワーカー起動
 - [ ] `scripts/start-scheduler.sh` - スケジューラ起動
 - [ ] `scripts/init-db.sh` - DB初期化
 
-### 7.12 マイグレーション自動実行
+### 7.13 マイグレーション自動実行
 - [ ] 起動時マイグレーション実行
 - [ ] マイグレーション失敗時の処理
 - [ ] ロールバック手順
 
-### 7.13 バックアップ設定
+### 7.14 バックアップ設定
 - [ ] PostgreSQLバックアップスクリプト
 - [ ] アップロードファイルバックアップ
 - [ ] バックアップスケジュール
 
-### 7.14 監視設定（オプション）
+### 7.15 監視設定（オプション）
 - [ ] Prometheus メトリクスエンドポイント
 - [ ] Grafanaダッシュボード設定
 - [ ] アラート設定
+- [ ] LLMサーバー接続状態監視
 
 ## 完了条件
 - [ ] `docker-compose up` で全サービスが起動する
@@ -123,6 +147,8 @@
 - [ ] 文字起こしがGPUで実行される
 - [ ] データが永続化される
 - [ ] コンテナ再起動後もデータが維持される
+- [ ] **オフライン環境でDockerイメージをインポート・起動できる**
+- [ ] **ローカルネットワーク内のLLMサーバーに接続できる**
 
 ## ディレクトリ構造
 
