@@ -1,0 +1,2 @@
+# Download HTMX before running:
+# curl -o htmx.min.js https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js
