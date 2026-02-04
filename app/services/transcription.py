@@ -5,7 +5,7 @@ import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Generator
+from typing import Callable, Generator
 
 from sqlalchemy.orm import Session
 
@@ -119,7 +119,7 @@ async def transcribe_audio(
 async def process_transcription_job(
     db: Session,
     job: TranscriptionJob,
-    progress_callback: callable | None = None,
+    progress_callback: Callable | None = None,
 ) -> bool:
     """
     Process a transcription job.
