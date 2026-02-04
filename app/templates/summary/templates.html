@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Prompt Templates - {{ title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Prompt Templates</h1>
+        {% if current_user.is_admin %}
+        <button onclick="showCreateModal()" class="btn btn-primary">
+            New Template
+        </button>
+        {% endif %}
+    </div>
+
+    {% if prompt_templates %}
+    <div class="grid gap-4 md:grid-cols-2">
+        {% for template in prompt_templates %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 class="text-lg font-medium text-gray-900">{{ template.name }}</h3>
+            {% if template.description %}
+            <p class="text-sm text-gray-500 mt-1">{{ template.description }}</p>
+            {% endif %}
+            <div class="mt-4 space-y-2">
+                <div>
+                    <span class="text-xs text-gray-500 uppercase">System Prompt:</span>
+                    <p class="text-sm text-gray-700 line-clamp-3">{{ template.system_prompt }}</p>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center space-x-2">
+                <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">Active</span>
+                {% if current_user.is_admin %}
+                <button onclick="editTemplate({{ template.id }})" class="text-sm text-primary-600 hover:text-primary-700">
+                    Edit
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <h3 class="mt-4 text-lg font-medium text-gray-900">No prompt templates</h3>
+        <p class="mt-2 text-gray-500">Default prompts will be used for summarization.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create/Edit Modal (placeholder) -->
+<div id="template-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <h2 class="text-xl font-bold text-gray-900" id="modal-title">New Prompt Template</h2>
+            <form id="template-form" class="mt-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    <input type="text" name="name" required class="form-input mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                    <input type="text" name="description" class="form-input mt-1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">System Prompt</label>
+                    <textarea name="system_prompt" rows="4" required class="form-input mt-1"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">User Prompt Template</label>
+                    <textarea name="user_prompt_template" rows="4" required class="form-input mt-1" placeholder="Use {text} as placeholder for transcription text"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="hideModal()" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showCreateModal() {
+    document.getElementById('modal-title').textContent = 'New Prompt Template';
+    document.getElementById('template-form').reset();
+    document.getElementById('template-modal').classList.remove('hidden');
+}
+
+function hideModal() {
+    document.getElementById('template-modal').classList.add('hidden');
+}
+
+function editTemplate(id) {
+    // TODO: Implement edit functionality
+    alert('Edit template: ' + id);
+}
+
+document.getElementById('template-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+
+    try {
+        const response = await fetch('/summary/api/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to create template'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+});
+</script>
+{% endblock %}

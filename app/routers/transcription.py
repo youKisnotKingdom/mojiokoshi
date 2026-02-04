@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import AudioFile, AudioSource, TranscriptionEngine, TranscriptionJob, TranscriptionStatus
+from app.models import AudioFile, AudioSource, Summary, TranscriptionEngine, TranscriptionJob, TranscriptionStatus
 from app.models.user import User
 from app.schemas.transcription import TranscriptionJobResponse
 from app.services import storage
@@ -187,6 +187,14 @@ async def job_detail_page(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    # Get summaries for this job
+    summary_stmt = (
+        select(Summary)
+        .where(Summary.transcription_job_id == job_id)
+        .order_by(Summary.created_at.desc())
+    )
+    summaries = db.execute(summary_stmt).scalars().all()
+
     return templates.TemplateResponse(
         "transcription/job_detail.html",
         {
@@ -194,6 +202,7 @@ async def job_detail_page(
             "title": "Transcription Job",
             "current_user": current_user,
             "job": job,
+            "summaries": summaries,
         },
     )
 

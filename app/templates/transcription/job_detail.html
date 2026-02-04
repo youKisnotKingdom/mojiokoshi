@@ -47,15 +47,58 @@
                 >
                     Copy
                 </button>
-                <a href="/transcription/job/{{ job.id }}/summarize" class="btn btn-primary text-sm">
-                    Summarize
-                </a>
+                <form action="/summary/api/transcription/{{ job.id }}/summarize" method="POST" class="inline">
+                    <button type="submit" class="btn btn-primary text-sm">
+                        Summarize
+                    </button>
+                </form>
             </div>
         </div>
         <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
             <pre id="result-text" class="whitespace-pre-wrap text-sm text-gray-700 font-sans">{{ job.result_text }}</pre>
         </div>
     </div>
+
+    <!-- Existing Summaries -->
+    {% if summaries %}
+    <div class="card">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Summaries</h3>
+        <div class="space-y-4">
+            {% for summary in summaries %}
+            <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-gray-500">
+                        {{ summary.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    </span>
+                    {% if summary.status.value == 'completed' %}
+                    <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">Completed</span>
+                    {% elif summary.status.value == 'processing' %}
+                    <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">Processing</span>
+                    {% elif summary.status.value == 'pending' %}
+                    <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded">Pending</span>
+                    {% elif summary.status.value == 'failed' %}
+                    <span class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Failed</span>
+                    {% endif %}
+                </div>
+                {% if summary.status.value == 'completed' and summary.result_text %}
+                <div class="text-sm text-gray-700 line-clamp-3">
+                    {{ summary.result_text[:300] }}{% if summary.result_text|length > 300 %}...{% endif %}
+                </div>
+                <a href="/summary/job/{{ summary.id }}" class="text-sm text-primary-600 hover:text-primary-700 mt-2 inline-block">
+                    View Full Summary &rarr;
+                </a>
+                {% elif summary.status.value == 'failed' %}
+                <p class="text-sm text-red-600">{{ summary.error_message or 'An error occurred' }}</p>
+                {% else %}
+                <a href="/summary/job/{{ summary.id }}" class="text-sm text-primary-600 hover:text-primary-700">
+                    View Status &rarr;
+                </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
     {% endif %}
 </div>
 
