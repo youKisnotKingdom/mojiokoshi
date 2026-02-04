@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-[60vh] flex items-center justify-center">
+    <div class="card w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-gray-900">Login</h1>
+            <p class="text-gray-600 mt-2">Enter your credentials to continue</p>
+        </div>
+
+        {% if error %}
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/auth/login" class="space-y-6">
+            <div>
+                <label for="user_id" class="label">User ID</label>
+                <input
+                    type="text"
+                    id="user_id"
+                    name="user_id"
+                    class="input"
+                    placeholder="Enter 6-digit ID"
+                    pattern="\d{6}"
+                    maxlength="6"
+                    value="{{ user_id or '' }}"
+                    required
+                    autofocus
+                />
+                <p class="text-xs text-gray-500 mt-1">6-digit numeric ID</p>
+            </div>
+
+            <div>
+                <label for="password" class="label">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="input"
+                    placeholder="Enter password"
+                    required
+                />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-full">
+                Login
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

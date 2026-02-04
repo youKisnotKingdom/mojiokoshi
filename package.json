@@ -1,0 +1,12 @@
+{
+  "name": "mojiokoshi",
+  "version": "0.1.0",
+  "description": "Transcription and summarization web app",
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/src/input.css -o ./static/css/styles.css --minify",
+    "watch:css": "tailwindcss -i ./static/src/input.css -o ./static/css/styles.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

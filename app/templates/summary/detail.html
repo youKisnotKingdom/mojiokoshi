@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Summary - {{ title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="/transcription/job/{{ summary.transcription_job_id }}" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </a>
+            <h1 class="text-2xl font-bold text-gray-900">Summary</h1>
+        </div>
+    </div>
+
+    <!-- Progress/Status -->
+    <div
+        id="summary-progress"
+        hx-get="/summary/api/job/{{ summary.id }}/progress"
+        hx-trigger="every 2s [data-summary-status='pending'], every 2s [data-summary-status='processing']"
+        hx-swap="outerHTML"
+    >
+        {% include "summary/partials/progress.html" %}
+    </div>
+
+    <!-- Result -->
+    {% if summary.status.value == 'completed' and summary.result_text %}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Summary Result</h2>
+            <p class="text-sm text-gray-500 mt-1">
+                Model: {{ summary.model_name or 'default' }}
+            </p>
+        </div>
+        <div class="p-6">
+            <div class="prose max-w-none">
+                {{ summary.result_text | replace('\n', '<br>') | safe }}
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div class="flex items-center space-x-4">
+                <button
+                    onclick="copyToClipboard()"
+                    class="btn btn-secondary text-sm"
+                >
+                    Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Info -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Details</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <dt class="text-sm text-gray-500">Created</dt>
+                <dd class="text-sm text-gray-900">{{ summary.created_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
+            </div>
+            {% if summary.started_at %}
+            <div>
+                <dt class="text-sm text-gray-500">Started</dt>
+                <dd class="text-sm text-gray-900">{{ summary.started_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
+            </div>
+            {% endif %}
+            {% if summary.completed_at %}
+            <div>
+                <dt class="text-sm text-gray-500">Completed</dt>
+                <dd class="text-sm text-gray-900">{{ summary.completed_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
+            </div>
+            {% endif %}
+            <div>
+                <dt class="text-sm text-gray-500">Model</dt>
+                <dd class="text-sm text-gray-900">{{ summary.model_name or 'default' }}</dd>
+            </div>
+        </dl>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyToClipboard() {
+    const text = `{{ summary.result_text | replace("'", "\\'") | replace('\n', '\\n') }}`;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+</script>
+{% endblock %}

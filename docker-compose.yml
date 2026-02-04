@@ -1,0 +1,98 @@
+version: "3.8"
+
+services:
+  # Main web application
+  web:
+    build: .
+    container_name: mojiokoshi-web
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://mojiokoshi:mojiokoshi@db:5432/mojiokoshi
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - UPLOAD_DIR=/app/uploads
+      - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}
+      - AUDIO_RETENTION_DAYS=${AUDIO_RETENTION_DAYS:-30}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    # GPU support (uncomment for NVIDIA GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Background worker for transcription and summarization
+  worker:
+    build: .
+    container_name: mojiokoshi-worker
+    command: python -m app.services.worker
+    environment:
+      - DATABASE_URL=postgresql://mojiokoshi:mojiokoshi@db:5432/mojiokoshi
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - UPLOAD_DIR=/app/uploads
+      - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    # GPU support (uncomment for NVIDIA GPU)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # PostgreSQL database
+  db:
+    image: postgres:15-alpine
+    container_name: mojiokoshi-db
+    environment:
+      - POSTGRES_USER=mojiokoshi
+      - POSTGRES_PASSWORD=mojiokoshi
+      - POSTGRES_DB=mojiokoshi
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mojiokoshi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for caching (optional, for future use)
+  redis:
+    image: redis:7-alpine
+    container_name: mojiokoshi-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  postgres_data:
+  redis_data:

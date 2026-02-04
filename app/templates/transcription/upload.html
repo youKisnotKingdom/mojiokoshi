@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Upload Audio</h1>
+        <a href="/transcription" class="text-gray-600 hover:text-gray-900">
+            &larr; Back
+        </a>
+    </div>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/transcription/upload" enctype="multipart/form-data" class="card space-y-6">
+        <div>
+            <label for="file" class="label">Audio File</label>
+            <div
+                id="drop-zone"
+                class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-primary-400 transition-colors cursor-pointer"
+            >
+                <div class="space-y-1 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <div class="flex text-sm text-gray-600">
+                        <label for="file" class="relative cursor-pointer rounded-md font-medium text-primary-600 hover:text-primary-500">
+                            <span>Upload a file</span>
+                            <input id="file" name="file" type="file" class="sr-only" accept="audio/*" required>
+                        </label>
+                        <p class="pl-1">or drag and drop</p>
+                    </div>
+                    <p class="text-xs text-gray-500">MP3, WAV, M4A, FLAC, OGG up to 500MB</p>
+                    <p id="file-name" class="text-sm font-medium text-primary-600 hidden"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label for="engine" class="label">Transcription Engine</label>
+                <select id="engine" name="engine" class="input">
+                    <option value="faster_whisper">Faster Whisper</option>
+                    <option value="whisper">OpenAI Whisper</option>
+                    <option value="qwen_asr">Qwen ASR</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="model_size" class="label">Model Size</label>
+                <select id="model_size" name="model_size" class="input">
+                    <option value="tiny">Tiny (fastest)</option>
+                    <option value="base">Base</option>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large" selected>Large (best quality)</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label for="language" class="label">Language (optional)</label>
+            <select id="language" name="language" class="input">
+                <option value="">Auto-detect</option>
+                <option value="ja">Japanese</option>
+                <option value="en">English</option>
+                <option value="zh">Chinese</option>
+                <option value="ko">Korean</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Leave empty for automatic language detection</p>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+                Upload & Transcribe
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file');
+    const fileName = document.getElementById('file-name');
+
+    // Click to upload
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    // Show selected file name
+    fileInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            fileName.textContent = this.files[0].name;
+            fileName.classList.remove('hidden');
+        }
+    });
+
+    // Drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-primary-500', 'bg-primary-50');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-primary-500', 'bg-primary-50');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary-500', 'bg-primary-50');
+
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            fileName.textContent = e.dataTransfer.files[0].name;
+            fileName.classList.remove('hidden');
+        }
+    });
+});
+</script>
+{% endblock %}
