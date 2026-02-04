@@ -50,20 +50,46 @@
 - [ ] Alembic初期化
 - [ ] 基本マイグレーション作成
 
-### 1.5 基本テンプレート構造
-- [ ] `templates/base.html` 作成（共通レイアウト）
-- [ ] HTMX CDN読み込み設定
-- [ ] 基本CSSスタイル（TailwindCSS CDN or 自前CSS）
-- [ ] `templates/index.html` 作成（トップページ）
+### 1.5 Tailwind CSS設定
+- [ ] `package.json` 作成（Tailwindビルド用）
+- [ ] Tailwind CSS インストール
+  ```bash
+  npm install -D tailwindcss
+  npx tailwindcss init
+  ```
+- [ ] `tailwind.config.js` 作成
+  - テンプレートパスの設定
+  - カスタムカラー設定（オプション）
+- [ ] `static/src/input.css` 作成（Tailwindディレクティブ）
+  ```css
+  @tailwind base;
+  @tailwind components;
+  @tailwind utilities;
+  ```
+- [ ] ビルドスクリプト設定（`package.json`）
+  ```json
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/src/input.css -o ./static/css/styles.css --minify",
+    "watch:css": "tailwindcss -i ./static/src/input.css -o ./static/css/styles.css --watch"
+  }
+  ```
+- [ ] `.gitignore` に `node_modules/` 追加
 
-### 1.6 開発用Docker設定
+### 1.6 基本テンプレート構造
+- [ ] `templates/base.html` 作成（共通レイアウト）
+- [ ] ビルド済みTailwind CSS読み込み（`/static/css/styles.css`）
+- [ ] HTMX読み込み（ローカルファイル `static/js/htmx.min.js`）
+- [ ] `templates/index.html` 作成（トップページ）
+- [ ] 共通コンポーネント用パーシャル（`templates/partials/`）
+
+### 1.7 開発用Docker設定
 - [ ] `docker-compose.dev.yml` 作成
 - [ ] PostgreSQL コンテナ設定
 - [ ] Redis コンテナ設定（タスクキュー用）
 - [ ] ボリューム設定（データ永続化）
 - [ ] 開発用環境変数ファイル（`.env.example`）
 
-### 1.7 開発ツール設定
+### 1.8 開発ツール設定
 - [ ] `.gitignore` 作成
 - [ ] `README.md` 更新（開発環境構築手順）
 - [ ] フォーマッター設定（black, isort）

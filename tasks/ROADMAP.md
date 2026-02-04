@@ -25,12 +25,12 @@
 
 | 項目 | 技術 |
 |------|------|
-| フロントエンド | HTMX + Jinja2テンプレート |
+| フロントエンド | HTMX + Jinja2テンプレート + **Tailwind CSS** |
 | バックエンド | FastAPI (Python) |
 | リアルタイム通信 | WebSocket（録音チャンク送信、ストリーミング文字起こし）|
 | データベース | PostgreSQL |
 | 文字起こし | Whisper / faster-whisper / qwen-asr (16GB GPU) |
-| サマライズ | 外部LLM API (OpenAI互換、エンドポイント設定可能) |
+| サマライズ | ローカルLLM API (OpenAI互換、エンドポイント設定可能) |
 | デプロイ | Docker Compose (GPU対応) |
 
 ## 機能一覧
