@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
+        <a href="/admin/users/new" class="btn btn-primary">
+            Add New User
+        </a>
+    </div>
+
+    <div class="card overflow-hidden p-0">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        User ID
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Name
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Role
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Last Login
+                    </th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for user in users %}
+                <tr class="{% if not user.is_active %}bg-gray-50 opacity-60{% endif %}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="font-mono text-sm">{{ user.user_id }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="font-medium text-gray-900">{{ user.display_name }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if user.role.value == 'admin' %}
+                        <span class="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                            Admin
+                        </span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                            User
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if user.is_active %}
+                        <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                            Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {% if user.last_login_at %}
+                        {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                        Never
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                        <a href="/admin/users/{{ user.user_id }}" class="text-primary-600 hover:text-primary-900 text-sm font-medium">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

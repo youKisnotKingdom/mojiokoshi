@@ -8,7 +8,7 @@
     <script src="{{ url_for('static', path='js/htmx.min.js') }}" defer></script>
     {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen flex flex-col">
     <nav class="bg-white shadow-sm border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
@@ -16,6 +16,7 @@
                     <a href="/" class="text-xl font-bold text-primary-600">
                         Mojiokoshi
                     </a>
+                    {% if current_user %}
                     <div class="hidden md:flex ml-10 space-x-4">
                         <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
                             Home
@@ -26,24 +27,42 @@
                         <a href="/history" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
                             History
                         </a>
+                        {% if current_user.is_admin %}
+                        <a href="/admin/users" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                            Users
+                        </a>
+                        {% endif %}
                     </div>
+                    {% endif %}
                 </div>
-                <div class="flex items-center">
-                    {% block nav_right %}
-                    <a href="/login" class="btn btn-primary text-sm">
+                <div class="flex items-center space-x-4">
+                    {% if current_user %}
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-gray-600">
+                            {{ current_user.display_name }}
+                            {% if current_user.is_admin %}
+                            <span class="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">Admin</span>
+                            {% endif %}
+                        </span>
+                        <a href="/auth/logout" class="btn btn-secondary text-sm">
+                            Logout
+                        </a>
+                    </div>
+                    {% else %}
+                    <a href="/auth/login" class="btn btn-primary text-sm">
                         Login
                     </a>
-                    {% endblock %}
+                    {% endif %}
                 </div>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="bg-white border-t border-gray-200 mt-auto">
+    <footer class="bg-white border-t border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <p class="text-center text-gray-500 text-sm">
                 Mojiokoshi - Transcription & Summarization

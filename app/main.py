@@ -1,17 +1,21 @@
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
+from app.dependencies import get_current_user_optional
+from app.models.user import User
+from app.routers import auth, users
 
 settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    description="音声文字起こし・サマライズ ウェブアプリケーション",
+    description="Audio transcription and summarization web application",
     version="0.1.0",
 )
 
@@ -22,6 +26,10 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 # Templates
 templates = Jinja2Templates(directory=BASE_DIR / "app" / "templates")
 
+# Include routers
+app.include_router(auth.router)
+app.include_router(users.router)
+
 
 @app.get("/health")
 async def health_check():
@@ -29,8 +37,15 @@ async def health_check():
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+async def index(
+    request: Request,
+    current_user: Annotated[User | None, Depends(get_current_user_optional)],
+):
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "title": settings.app_name},
+        {
+            "request": request,
+            "title": settings.app_name,
+            "current_user": current_user,
+        },
     )
