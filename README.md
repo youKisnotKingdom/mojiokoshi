@@ -35,11 +35,17 @@ Audio transcription and summarization web application for on-premises deployment
 ```bash
 # Create virtual environment
 python -m venv .venv
+
 source .venv/bin/activate  # Linux/Mac
 # .venv\Scripts\activate  # Windows
 
 # Install Python dependencies
 pip install -r requirements.txt
+
+# If you use uv
+uv venv .venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 
 # Install Node dependencies and build CSS
 npm install
