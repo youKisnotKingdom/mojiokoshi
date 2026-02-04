@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import Base, engine, SessionLocal
 from app.models import *  # Import all models to register them
-from app.services.auth import create_user, get_user_by_id
+from app.services.auth import get_user_by_user_id, get_password_hash
 
 
 def init_db():
@@ -22,24 +22,27 @@ def init_db():
 
 
 def create_admin_user(user_id: str, password: str):
-    """Create an admin user."""
-    from app.models.user import UserRole
+    """Create an admin user with specified user_id."""
+    from app.models.user import User, UserRole
 
     db = SessionLocal()
     try:
         # Check if user already exists
-        existing = get_user_by_id(db, int(user_id))
+        existing = get_user_by_user_id(db, user_id)
         if existing:
             print(f"User {user_id} already exists.")
             return
 
-        user = create_user(
-            db,
+        # Create user directly with specified user_id
+        user = User(
             user_id=user_id,
-            password=password,
+            password_hash=get_password_hash(password),
             display_name="Administrator",
             role=UserRole.ADMIN,
         )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
         print(f"Admin user created: {user.user_id}")
 
     finally:
