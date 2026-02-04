@@ -8,13 +8,15 @@ import sys
 
 from app.config import get_settings
 from app.database import SessionLocal
-from app.services import summarization, transcription
+from app.services import cleanup, summarization, transcription
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # Worker state
 _running = False
+_cleanup_counter = 0
+CLEANUP_INTERVAL = 720  # Run cleanup every 720 polls (~1 hour at 5s interval)
 
 
 async def process_transcription_jobs():
@@ -52,8 +54,9 @@ async def worker_loop(poll_interval: float = 5.0):
     Args:
         poll_interval: Seconds to wait between checks for new jobs
     """
-    global _running
+    global _running, _cleanup_counter
     _running = True
+    _cleanup_counter = 0
 
     logger.info("Worker started")
 
@@ -64,6 +67,12 @@ async def worker_loop(poll_interval: float = 5.0):
 
             # Process one summary job
             await process_summary_jobs()
+
+            # Run cleanup periodically
+            _cleanup_counter += 1
+            if _cleanup_counter >= CLEANUP_INTERVAL:
+                _cleanup_counter = 0
+                await cleanup.run_cleanup_job()
 
             # Wait before next poll
             await asyncio.sleep(poll_interval)

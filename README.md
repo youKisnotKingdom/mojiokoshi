@@ -79,6 +79,79 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 npm run watch:css
 ```
 
+## Production Deployment (Docker)
+
+### Prerequisites
+
+- Docker & Docker Compose
+- NVIDIA GPU with CUDA support (for transcription)
+- Local LLM server (vLLM, Ollama, llama.cpp, etc.)
+
+### Quick Deploy
+
+1. Clone and configure:
+
+```bash
+git clone <repository>
+cd mojiokoshi
+cp .env.example .env
+```
+
+2. Edit `.env` with your settings:
+
+```bash
+# Required: Set a secure secret key
+SECRET_KEY=your-secure-secret-key-here
+
+# LLM server on your local network
+LLM_API_BASE_URL=http://192.168.1.100:8080/v1
+LLM_MODEL_NAME=your-model-name
+
+# Whisper settings
+WHISPER_MODEL_SIZE=large
+WHISPER_DEVICE=cuda  # or 'cpu' for CPU-only
+```
+
+3. Build and start:
+
+```bash
+docker-compose up -d --build
+```
+
+4. Create admin user:
+
+```bash
+docker-compose exec web python scripts/init_db.py --create-admin --admin-id 000001
+```
+
+5. Access at http://localhost:8000
+
+### GPU Support
+
+For NVIDIA GPU support, ensure you have:
+- NVIDIA Container Toolkit installed
+- Uncomment GPU sections in `docker-compose.yml`
+
+### Services
+
+The deployment includes:
+- **web**: Main web application (FastAPI)
+- **worker**: Background worker for transcription and summarization
+- **db**: PostgreSQL database
+- **redis**: Redis for caching (optional)
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SECRET_KEY` | - | Secret key for session signing |
+| `DATABASE_URL` | - | PostgreSQL connection URL |
+| `LLM_API_BASE_URL` | - | Local LLM server URL |
+| `LLM_MODEL_NAME` | default | Model name for summarization |
+| `WHISPER_MODEL_SIZE` | large | Whisper model (tiny/base/small/medium/large) |
+| `WHISPER_DEVICE` | cuda | Device for Whisper (cuda/cpu) |
+| `AUDIO_RETENTION_DAYS` | 30 | Days to keep audio files |
+
 ## Project Structure
 
 ```
