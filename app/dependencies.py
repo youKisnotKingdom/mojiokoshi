@@ -72,3 +72,19 @@ def get_current_admin_user(
             detail="Admin access required",
         )
     return user
+
+
+def get_user_from_session_cookie(session_cookie: str, db: Session) -> User | None:
+    """Get user from session cookie value (for WebSocket authentication)."""
+    if not session_cookie:
+        return None
+
+    data = verify_session_token(session_cookie)
+    if not data:
+        return None
+
+    user = auth_service.get_user_by_id(db, data["user_id"])
+    if not user or not user.is_active:
+        return None
+
+    return user

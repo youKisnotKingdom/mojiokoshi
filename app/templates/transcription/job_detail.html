@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Transcription Job</h1>
+        <a href="/history" class="text-gray-600 hover:text-gray-900">
+            View All Jobs &rarr;
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">
+                    {{ job.audio_file.original_filename }}
+                </h2>
+                <p class="text-sm text-gray-500">
+                    Uploaded {{ job.created_at.strftime('%Y-%m-%d %H:%M') }}
+                </p>
+            </div>
+            <div class="text-right">
+                <span class="text-sm text-gray-500">Engine:</span>
+                <span class="ml-1 px-2 py-1 text-xs bg-gray-100 rounded">{{ job.engine.value }}</span>
+            </div>
+        </div>
+
+        <div
+            id="job-progress"
+            hx-get="/transcription/job/{{ job.id }}/progress"
+            hx-trigger="load, every 2s [data-status='pending'], every 2s [data-status='processing']"
+            hx-swap="innerHTML"
+            data-status="{{ job.status.value }}"
+        >
+            {% include "transcription/partials/job_progress.html" %}
+        </div>
+    </div>
+
+    {% if job.is_complete and job.result_text %}
+    <div class="card">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Transcription Result</h3>
+            <div class="flex space-x-2">
+                <button
+                    onclick="copyToClipboard()"
+                    class="btn btn-secondary text-sm"
+                >
+                    Copy
+                </button>
+                <a href="/transcription/job/{{ job.id }}/summarize" class="btn btn-primary text-sm">
+                    Summarize
+                </a>
+            </div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <pre id="result-text" class="whitespace-pre-wrap text-sm text-gray-700 font-sans">{{ job.result_text }}</pre>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyToClipboard() {
+    const text = document.getElementById('result-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+
+// Update data-status attribute after HTMX swap
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'job-progress') {
+        const statusEl = event.detail.target.querySelector('[data-job-status]');
+        if (statusEl) {
+            event.detail.target.setAttribute('data-status', statusEl.dataset.jobStatus);
+        }
+    }
+});
+</script>
+{% endblock %}

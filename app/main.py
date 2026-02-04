@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from app.config import get_settings
 from app.dependencies import get_current_user_optional
 from app.models.user import User
-from app.routers import auth, users
+from app.routers import auth, history, recording_ws, transcription, users
 
 settings = get_settings()
 
@@ -29,6 +29,9 @@ templates = Jinja2Templates(directory=BASE_DIR / "app" / "templates")
 # Include routers
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(transcription.router)
+app.include_router(recording_ws.router)
+app.include_router(history.router)
 
 
 @app.get("/health")
