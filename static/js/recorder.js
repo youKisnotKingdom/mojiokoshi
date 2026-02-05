@@ -85,11 +85,11 @@ class AudioRecorder {
 
             // Update UI
             this.updateUI('recording');
-            this.updateStatus('Recording...');
+            this.updateStatus('録音中...');
 
         } catch (error) {
             console.error('Error starting recording:', error);
-            this.updateStatus('Error: ' + error.message);
+            this.updateStatus('エラー: ' + error.message);
         }
     }
 
@@ -99,7 +99,7 @@ class AudioRecorder {
             this.isPaused = true;
             this.pausedTime = Date.now();
             this.updateUI('paused');
-            this.updateStatus('Paused');
+            this.updateStatus('一時停止中');
         }
     }
 
@@ -110,7 +110,7 @@ class AudioRecorder {
             this.startTime += pauseDuration;
             this.isPaused = false;
             this.updateUI('recording');
-            this.updateStatus('Recording...');
+            this.updateStatus('録音中...');
         }
     }
 
@@ -141,7 +141,7 @@ class AudioRecorder {
                 this.isRecording = false;
                 this.isPaused = false;
                 this.updateUI('stopped');
-                this.updateStatus('Recording saved');
+                this.updateStatus('録音を保存しました');
 
                 resolve();
             };
@@ -188,7 +188,7 @@ class AudioRecorder {
 
             case 'error':
                 console.error('Server error:', message.message);
-                this.updateStatus('Error: ' + message.message);
+                this.updateStatus('エラー: ' + message.message);
                 break;
         }
     }
@@ -333,11 +333,11 @@ class AudioRecorder {
         if (connected) {
             this.connectionDot.classList.remove('bg-gray-400', 'bg-red-400');
             this.connectionDot.classList.add('bg-green-400');
-            this.connectionText.textContent = 'Connected';
+            this.connectionText.textContent = '接続中';
         } else {
             this.connectionDot.classList.remove('bg-gray-400', 'bg-green-400');
             this.connectionDot.classList.add('bg-red-400');
-            this.connectionText.textContent = 'Disconnected';
+            this.connectionText.textContent = '切断';
         }
     }
 }

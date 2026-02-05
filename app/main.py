@@ -15,7 +15,7 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    description="Audio transcription and summarization web application",
+    description="音声文字起こし＆要約Webアプリケーション",
     version="0.1.0",
 )
 

@@ -19,17 +19,17 @@
                     {% if current_user %}
                     <div class="hidden md:flex ml-10 space-x-4">
                         <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                            Home
+                            ホーム
                         </a>
                         <a href="/transcription" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                            Transcription
+                            文字起こし
                         </a>
                         <a href="/history" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                            History
+                            履歴
                         </a>
                         {% if current_user.is_admin %}
                         <a href="/admin/users" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                            Users
+                            ユーザー管理
                         </a>
                         {% endif %}
                     </div>
@@ -41,16 +41,16 @@
                         <span class="text-sm text-gray-600">
                             {{ current_user.display_name }}
                             {% if current_user.is_admin %}
-                            <span class="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">Admin</span>
+                            <span class="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">管理者</span>
                             {% endif %}
                         </span>
                         <a href="/auth/logout" class="btn btn-secondary text-sm">
-                            Logout
+                            ログアウト
                         </a>
                     </div>
                     {% else %}
                     <a href="/auth/login" class="btn btn-primary text-sm">
-                        Login
+                        ログイン
                     </a>
                     {% endif %}
                 </div>
@@ -65,7 +65,7 @@
     <footer class="bg-white border-t border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <p class="text-center text-gray-500 text-sm">
-                Mojiokoshi - Transcription & Summarization
+                Mojiokoshi - 文字起こし＆要約
             </p>
         </div>
     </footer>

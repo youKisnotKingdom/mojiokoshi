@@ -3,21 +3,21 @@
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6">
     <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-900">Record Audio</h1>
+        <h1 class="text-2xl font-bold text-gray-900">音声録音</h1>
         <a href="/transcription" class="text-gray-600 hover:text-gray-900">
-            &larr; Back
+            &larr; 戻る
         </a>
     </div>
 
     <div class="grid md:grid-cols-2 gap-6">
         <!-- Recording controls -->
         <div class="card">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Recording</h2>
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">録音</h2>
 
             <!-- Timer display -->
             <div class="text-center mb-6">
                 <div id="timer" class="text-5xl font-mono font-bold text-gray-900">00:00:00</div>
-                <div id="status" class="text-sm text-gray-500 mt-2">Ready to record</div>
+                <div id="status" class="text-sm text-gray-500 mt-2">録音準備完了</div>
             </div>
 
             <!-- Recording controls -->
@@ -68,24 +68,24 @@
             <div id="connection-status" class="mt-6 text-center">
                 <span class="inline-flex items-center text-sm">
                     <span id="connection-dot" class="w-2 h-2 rounded-full bg-gray-400 mr-2"></span>
-                    <span id="connection-text">Not connected</span>
+                    <span id="connection-text">未接続</span>
                 </span>
             </div>
 
             <!-- Chunk info -->
             <div id="chunk-info" class="mt-4 text-center text-sm text-gray-500 hidden">
-                <span id="chunk-count">0</span> chunks saved
+                <span id="chunk-count">0</span> チャンク保存済み
             </div>
         </div>
 
         <!-- Real-time transcription -->
         <div class="card">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Live Transcription</h2>
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">リアルタイム文字起こし</h2>
             <div
                 id="transcription-output"
                 class="bg-gray-50 rounded-lg p-4 h-80 overflow-y-auto text-sm"
             >
-                <p class="text-gray-400 italic">Transcription will appear here as you speak...</p>
+                <p class="text-gray-400 italic">話し始めると、ここに文字起こしが表示されます...</p>
             </div>
         </div>
     </div>
@@ -97,16 +97,16 @@
                 <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
             </svg>
             <div>
-                <h3 class="font-medium text-yellow-800">Previous session found</h3>
+                <h3 class="font-medium text-yellow-800">前回のセッションが見つかりました</h3>
                 <p class="text-sm text-yellow-700 mt-1">
-                    You have an incomplete recording session. Would you like to continue?
+                    未完了の録音セッションがあります。続行しますか？
                 </p>
                 <div class="mt-3 space-x-3">
                     <button onclick="recoverSession()" class="btn btn-primary text-sm">
-                        Continue Recording
+                        録音を続行
                     </button>
                     <button onclick="discardSession()" class="btn btn-secondary text-sm">
-                        Start Fresh
+                        新しく開始
                     </button>
                 </div>
             </div>

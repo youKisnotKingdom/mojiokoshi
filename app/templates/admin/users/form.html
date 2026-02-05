@@ -4,10 +4,10 @@
 <div class="max-w-2xl mx-auto space-y-6">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-900">
-            {% if user %}Edit User{% else %}New User{% endif %}
+            {% if user %}ユーザー編集{% else %}新規ユーザー{% endif %}
         </h1>
         <a href="/admin/users" class="text-gray-600 hover:text-gray-900">
-            &larr; Back to Users
+            &larr; ユーザー一覧に戻る
         </a>
     </div>
 
@@ -28,11 +28,11 @@
         <div class="mb-6 pb-6 border-b border-gray-200">
             <div class="flex items-center space-x-4">
                 <div>
-                    <p class="text-sm text-gray-500">User ID</p>
+                    <p class="text-sm text-gray-500">ユーザーID</p>
                     <p class="font-mono text-lg font-bold text-gray-900">{{ user.user_id }}</p>
                 </div>
                 <div>
-                    <p class="text-sm text-gray-500">Created</p>
+                    <p class="text-sm text-gray-500">作成日</p>
                     <p class="text-gray-900">{{ user.created_at.strftime('%Y-%m-%d') }}</p>
                 </div>
             </div>
@@ -41,7 +41,7 @@
 
         <form method="POST" action="{% if user %}/admin/users/{{ user.user_id }}{% else %}/admin/users/new{% endif %}" class="space-y-6">
             <div>
-                <label for="display_name" class="label">Display Name</label>
+                <label for="display_name" class="label">表示名</label>
                 <input
                     type="text"
                     id="display_name"
@@ -54,7 +54,7 @@
 
             {% if not user %}
             <div>
-                <label for="password" class="label">Password</label>
+                <label for="password" class="label">パスワード</label>
                 <input
                     type="password"
                     id="password"
@@ -63,15 +63,15 @@
                     minlength="4"
                     required
                 />
-                <p class="text-xs text-gray-500 mt-1">Minimum 4 characters</p>
+                <p class="text-xs text-gray-500 mt-1">4文字以上</p>
             </div>
             {% endif %}
 
             <div>
-                <label for="role" class="label">Role</label>
+                <label for="role" class="label">権限</label>
                 <select id="role" name="role" class="input">
-                    <option value="user" {% if user and user.role.value == 'user' %}selected{% endif %}>User</option>
-                    <option value="admin" {% if user and user.role.value == 'admin' %}selected{% endif %}>Admin</option>
+                    <option value="user" {% if user and user.role.value == 'user' %}selected{% endif %}>一般ユーザー</option>
+                    <option value="admin" {% if user and user.role.value == 'admin' %}selected{% endif %}>管理者</option>
                 </select>
             </div>
 
@@ -86,14 +86,14 @@
                     {% if user.is_active %}checked{% endif %}
                 />
                 <label for="is_active" class="ml-2 text-sm text-gray-700">
-                    Active
+                    有効
                 </label>
             </div>
             {% endif %}
 
             <div class="flex justify-end">
                 <button type="submit" class="btn btn-primary">
-                    {% if user %}Update User{% else %}Create User{% endif %}
+                    {% if user %}ユーザーを更新{% else %}ユーザーを作成{% endif %}
                 </button>
             </div>
         </form>
@@ -101,10 +101,10 @@
 
     {% if user %}
     <div class="card">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Reset Password</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">パスワードリセット</h2>
         <form method="POST" action="/admin/users/{{ user.user_id }}/reset-password" class="space-y-4">
             <div>
-                <label for="new_password" class="label">New Password</label>
+                <label for="new_password" class="label">新しいパスワード</label>
                 <input
                     type="password"
                     id="new_password"
@@ -116,7 +116,7 @@
             </div>
             <div class="flex justify-end">
                 <button type="submit" class="btn btn-secondary">
-                    Reset Password
+                    パスワードをリセット
                 </button>
             </div>
         </form>

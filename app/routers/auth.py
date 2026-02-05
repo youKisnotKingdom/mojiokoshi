@@ -33,7 +33,7 @@ async def login_page(
 
     return templates.TemplateResponse(
         "auth/login.html",
-        {"request": request, "title": "Login"},
+        {"request": request, "title": "ログイン"},
     )
 
 
@@ -52,8 +52,8 @@ async def login(
             "auth/login.html",
             {
                 "request": request,
-                "title": "Login",
-                "error": "Invalid user ID or password",
+                "title": "ログイン",
+                "error": "ユーザーIDまたはパスワードが正しくありません",
                 "user_id": user_id,
             },
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -99,11 +99,11 @@ async def api_login(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user ID or password",
+            detail="ユーザーIDまたはパスワードが正しくありません",
         )
 
     return LoginResponse(
-        message="Login successful",
+        message="ログインに成功しました",
         user=UserResponse.model_validate(user),
     )
 

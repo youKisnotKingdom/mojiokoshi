@@ -31,7 +31,7 @@ async def transcription_page(
         "transcription/index.html",
         {
             "request": request,
-            "title": "Transcription",
+            "title": "文字起こし",
             "current_user": current_user,
         },
     )
@@ -47,7 +47,7 @@ async def upload_page(
         "transcription/upload.html",
         {
             "request": request,
-            "title": "Upload Audio",
+            "title": "音声アップロード",
             "current_user": current_user,
             "engines": TranscriptionEngine,
         },
@@ -71,10 +71,10 @@ async def upload_file(
             "transcription/upload.html",
             {
                 "request": request,
-                "title": "Upload Audio",
+                "title": "音声アップロード",
                 "current_user": current_user,
                 "engines": TranscriptionEngine,
-                "error": "No file selected",
+                "error": "ファイルが選択されていません",
             },
             status_code=400,
         )
@@ -85,10 +85,10 @@ async def upload_file(
             "transcription/upload.html",
             {
                 "request": request,
-                "title": "Upload Audio",
+                "title": "音声アップロード",
                 "current_user": current_user,
                 "engines": TranscriptionEngine,
-                "error": f"Invalid file type: {file.content_type}. Please upload an audio file.",
+                "error": f"無効なファイル形式です: {file.content_type}。音声ファイルをアップロードしてください。",
             },
             status_code=400,
         )
@@ -100,10 +100,10 @@ async def upload_file(
             "transcription/upload.html",
             {
                 "request": request,
-                "title": "Upload Audio",
+                "title": "音声アップロード",
                 "current_user": current_user,
                 "engines": TranscriptionEngine,
-                "error": f"File too large. Maximum size is {settings.max_upload_size // 1024 // 1024}MB.",
+                "error": f"ファイルが大きすぎます。最大サイズは{settings.max_upload_size // 1024 // 1024}MBです。",
             },
             status_code=400,
         )
@@ -163,7 +163,7 @@ async def record_page(
         "transcription/record.html",
         {
             "request": request,
-            "title": "Record Audio",
+            "title": "音声録音",
             "current_user": current_user,
         },
     )
@@ -185,7 +185,7 @@ async def job_detail_page(
     job = db.execute(stmt).scalar_one_or_none()
 
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="ジョブが見つかりません")
 
     # Get summaries for this job
     summary_stmt = (
@@ -199,7 +199,7 @@ async def job_detail_page(
         "transcription/job_detail.html",
         {
             "request": request,
-            "title": "Transcription Job",
+            "title": "文字起こしジョブ",
             "current_user": current_user,
             "job": job,
             "summaries": summaries,
@@ -223,7 +223,7 @@ async def job_progress_partial(
     job = db.execute(stmt).scalar_one_or_none()
 
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="ジョブが見つかりません")
 
     return templates.TemplateResponse(
         "transcription/partials/job_progress.html",
@@ -269,6 +269,6 @@ async def get_job(
     job = db.execute(stmt).scalar_one_or_none()
 
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="ジョブが見つかりません")
 
     return TranscriptionJobResponse.model_validate(job)

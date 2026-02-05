@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}History - {{ title }}{% endblock %}
+{% block title %}履歴 - {{ title }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
     <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-900">Transcription History</h1>
+        <h1 class="text-2xl font-bold text-gray-900">文字起こし履歴</h1>
         <a href="/transcription" class="btn btn-primary">
-            New Transcription
+            新規文字起こし
         </a>
     </div>
 
@@ -18,19 +18,19 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            File
+                            ファイル
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Source
+                            ソース
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
+                            ステータス
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Created
+                            作成日時
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
+                            操作
                         </th>
                     </tr>
                 </thead>
@@ -55,30 +55,30 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if job.audio_file and job.audio_file.source.value == 'upload' %}
                             <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                                Upload
+                                アップロード
                             </span>
                             {% else %}
                             <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                                Recording
+                                録音
                             </span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if job.status.value == 'pending' %}
                             <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
-                                Pending
+                                待機中
                             </span>
                             {% elif job.status.value == 'processing' %}
                             <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                                Processing
+                                処理中
                             </span>
                             {% elif job.status.value == 'completed' %}
                             <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                                Completed
+                                完了
                             </span>
                             {% elif job.status.value == 'failed' %}
                             <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                                Failed
+                                失敗
                             </span>
                             {% endif %}
                         </td>
@@ -87,7 +87,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <a href="/transcription/job/{{ job.id }}" class="text-primary-600 hover:text-primary-700">
-                                View
+                                表示
                             </a>
                         </td>
                     </tr>
@@ -101,17 +101,17 @@
     {% if total_pages > 1 %}
     <div class="flex items-center justify-between">
         <div class="text-sm text-gray-500">
-            Showing {{ offset + 1 }} to {{ offset + jobs|length }} of {{ total_count }} results
+            {{ total_count }}件中 {{ offset + 1 }} - {{ offset + jobs|length }}件を表示
         </div>
         <div class="flex space-x-2">
             {% if page > 1 %}
             <a href="/history?page={{ page - 1 }}" class="btn btn-secondary text-sm">
-                Previous
+                前へ
             </a>
             {% endif %}
             {% if page < total_pages %}
             <a href="/history?page={{ page + 1 }}" class="btn btn-secondary text-sm">
-                Next
+                次へ
             </a>
             {% endif %}
         </div>
@@ -123,10 +123,10 @@
         <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
         </svg>
-        <h3 class="mt-4 text-lg font-medium text-gray-900">No transcriptions yet</h3>
-        <p class="mt-2 text-gray-500">Get started by uploading an audio file or recording.</p>
+        <h3 class="mt-4 text-lg font-medium text-gray-900">文字起こしデータがありません</h3>
+        <p class="mt-2 text-gray-500">音声ファイルをアップロードするか、録音を開始してください。</p>
         <a href="/transcription" class="btn btn-primary mt-4 inline-block">
-            Start Transcription
+            文字起こしを開始
         </a>
     </div>
     {% endif %}
