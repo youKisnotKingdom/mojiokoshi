@@ -55,7 +55,7 @@ async def history_page(
         "history/index.html",
         {
             "request": request,
-            "title": "History",
+            "title": "履歴",
             "current_user": current_user,
             "jobs": jobs,
             "page": page,

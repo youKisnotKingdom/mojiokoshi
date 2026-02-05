@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Summary - {{ title }}{% endblock %}
+{% block title %}要約 - {{ title }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,7 +11,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                 </svg>
             </a>
-            <h1 class="text-2xl font-bold text-gray-900">Summary</h1>
+            <h1 class="text-2xl font-bold text-gray-900">要約</h1>
         </div>
     </div>
 
@@ -29,9 +29,9 @@
     {% if summary.status.value == 'completed' and summary.result_text %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-4 border-b border-gray-200">
-            <h2 class="text-lg font-medium text-gray-900">Summary Result</h2>
+            <h2 class="text-lg font-medium text-gray-900">要約結果</h2>
             <p class="text-sm text-gray-500 mt-1">
-                Model: {{ summary.model_name or 'default' }}
+                モデル: {{ summary.model_name or 'default' }}
             </p>
         </div>
         <div class="p-6">
@@ -45,7 +45,7 @@
                     onclick="copyToClipboard()"
                     class="btn btn-secondary text-sm"
                 >
-                    Copy to Clipboard
+                    クリップボードにコピー
                 </button>
             </div>
         </div>
@@ -54,26 +54,26 @@
 
     <!-- Info -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Details</h2>
+        <h2 class="text-lg font-medium text-gray-900 mb-4">詳細情報</h2>
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-                <dt class="text-sm text-gray-500">Created</dt>
+                <dt class="text-sm text-gray-500">作成日時</dt>
                 <dd class="text-sm text-gray-900">{{ summary.created_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
             </div>
             {% if summary.started_at %}
             <div>
-                <dt class="text-sm text-gray-500">Started</dt>
+                <dt class="text-sm text-gray-500">開始日時</dt>
                 <dd class="text-sm text-gray-900">{{ summary.started_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
             </div>
             {% endif %}
             {% if summary.completed_at %}
             <div>
-                <dt class="text-sm text-gray-500">Completed</dt>
+                <dt class="text-sm text-gray-500">完了日時</dt>
                 <dd class="text-sm text-gray-900">{{ summary.completed_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
             </div>
             {% endif %}
             <div>
-                <dt class="text-sm text-gray-500">Model</dt>
+                <dt class="text-sm text-gray-500">モデル</dt>
                 <dd class="text-sm text-gray-900">{{ summary.model_name or 'default' }}</dd>
             </div>
         </dl>
@@ -86,7 +86,7 @@
 function copyToClipboard() {
     const text = `{{ summary.result_text | replace("'", "\\'") | replace('\n', '\\n') }}`;
     navigator.clipboard.writeText(text).then(() => {
-        alert('Copied to clipboard!');
+        alert('クリップボードにコピーしました！');
     });
 }
 </script>

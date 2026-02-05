@@ -28,7 +28,7 @@ async def users_list_page(
         "admin/users/list.html",
         {
             "request": request,
-            "title": "User Management",
+            "title": "ユーザー管理",
             "users": users,
             "current_user": admin,
         },
@@ -45,7 +45,7 @@ async def new_user_page(
         "admin/users/form.html",
         {
             "request": request,
-            "title": "New User",
+            "title": "新規ユーザー",
             "user": None,
             "roles": UserRole,
             "current_user": admin,
@@ -80,7 +80,7 @@ async def create_user(
         "admin/users/created.html",
         {
             "request": request,
-            "title": "User Created",
+            "title": "ユーザー作成完了",
             "user": user,
             "current_user": admin,
         },
@@ -97,13 +97,13 @@ async def edit_user_page(
     """Show edit user form."""
     user = auth_service.get_user_by_user_id(db, user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
 
     return templates.TemplateResponse(
         "admin/users/form.html",
         {
             "request": request,
-            "title": f"Edit User: {user.display_name}",
+            "title": f"ユーザー編集: {user.display_name}",
             "user": user,
             "roles": UserRole,
             "current_user": admin,
@@ -124,7 +124,7 @@ async def update_user(
     """Update a user."""
     user = auth_service.get_user_by_user_id(db, user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
 
     try:
         user_role = UserRole(role)
@@ -137,11 +137,11 @@ async def update_user(
             "admin/users/form.html",
             {
                 "request": request,
-                "title": f"Edit User: {user.display_name}",
+                "title": f"ユーザー編集: {user.display_name}",
                 "user": user,
                 "roles": UserRole,
                 "current_user": admin,
-                "error": "You cannot deactivate your own account",
+                "error": "自分自身のアカウントを無効化することはできません",
             },
         )
 
@@ -157,11 +157,11 @@ async def update_user(
         "admin/users/form.html",
         {
             "request": request,
-            "title": f"Edit User: {user.display_name}",
+            "title": f"ユーザー編集: {user.display_name}",
             "user": user,
             "roles": UserRole,
             "current_user": admin,
-            "success": "User updated successfully",
+            "success": "ユーザー情報を更新しました",
         },
     )
 
@@ -177,7 +177,7 @@ async def reset_user_password(
     """Reset a user's password."""
     user = auth_service.get_user_by_user_id(db, user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
 
     auth_service.update_user_password(db, user, new_password)
 
@@ -185,11 +185,11 @@ async def reset_user_password(
         "admin/users/form.html",
         {
             "request": request,
-            "title": f"Edit User: {user.display_name}",
+            "title": f"ユーザー編集: {user.display_name}",
             "user": user,
             "roles": UserRole,
             "current_user": admin,
-            "success": "Password reset successfully",
+            "success": "パスワードをリセットしました",
         },
     )
 

@@ -43,7 +43,7 @@ async def prompt_templates_page(
         "summary/templates.html",
         {
             "request": request,
-            "title": "Prompt Templates",
+            "title": "プロンプトテンプレート",
             "current_user": current_user,
             "prompt_templates": prompt_templates,
         },
@@ -67,13 +67,13 @@ async def summary_detail_page(
     summary = db.execute(stmt).unique().scalar_one_or_none()
 
     if not summary:
-        raise HTTPException(status_code=404, detail="Summary not found")
+        raise HTTPException(status_code=404, detail="要約が見つかりません")
 
     return templates.TemplateResponse(
         "summary/detail.html",
         {
             "request": request,
-            "title": "Summary",
+            "title": "要約",
             "current_user": current_user,
             "summary": summary,
         },
@@ -97,10 +97,10 @@ async def create_summary(
     transcription = db.execute(stmt).scalar_one_or_none()
 
     if not transcription:
-        raise HTTPException(status_code=404, detail="Transcription job not found")
+        raise HTTPException(status_code=404, detail="文字起こしジョブが見つかりません")
 
     if transcription.status != TranscriptionStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="Transcription is not completed")
+        raise HTTPException(status_code=400, detail="文字起こしが完了していません")
 
     # Create summary
     summary = await summarization.create_summary_for_transcription(
@@ -130,10 +130,10 @@ async def summarize_transcription(
     transcription = db.execute(stmt).scalar_one_or_none()
 
     if not transcription:
-        raise HTTPException(status_code=404, detail="Transcription job not found")
+        raise HTTPException(status_code=404, detail="文字起こしジョブが見つかりません")
 
     if transcription.status != TranscriptionStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="Transcription is not completed")
+        raise HTTPException(status_code=400, detail="文字起こしが完了していません")
 
     # Create summary
     summary = await summarization.create_summary_for_transcription(
@@ -162,7 +162,7 @@ async def get_summary(
     summary = db.execute(stmt).scalar_one_or_none()
 
     if not summary:
-        raise HTTPException(status_code=404, detail="Summary not found")
+        raise HTTPException(status_code=404, detail="要約が見つかりません")
 
     return SummaryResponse.model_validate(summary)
 
@@ -183,7 +183,7 @@ async def summary_progress_partial(
     summary = db.execute(stmt).scalar_one_or_none()
 
     if not summary:
-        raise HTTPException(status_code=404, detail="Summary not found")
+        raise HTTPException(status_code=404, detail="要約が見つかりません")
 
     return templates.TemplateResponse(
         "summary/partials/progress.html",
@@ -218,7 +218,7 @@ async def create_prompt_template(
 ):
     """Create a new prompt template (admin only)."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise HTTPException(status_code=403, detail="管理者権限が必要です")
 
     template = PromptTemplate(
         name=data.name,
@@ -242,13 +242,13 @@ async def update_prompt_template(
 ):
     """Update a prompt template (admin only)."""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise HTTPException(status_code=403, detail="管理者権限が必要です")
 
     stmt = select(PromptTemplate).where(PromptTemplate.id == template_id)
     template = db.execute(stmt).scalar_one_or_none()
 
     if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise HTTPException(status_code=404, detail="テンプレートが見つかりません")
 
     # Update fields
     update_data = data.model_dump(exclude_unset=True)
