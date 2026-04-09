@@ -69,6 +69,38 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
+  # Real-time transcription checker demo
+  checker:
+    build: .
+    image: mojiokoshi:latest
+    container_name: mojiokoshi-checker
+    command: uvicorn demo.checker:app --host 0.0.0.0 --port 8001 --log-level info
+    ports:
+      - "${CHECKER_PORT:-8001}:8001"
+    environment:
+      - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+      - HF_HOME=/app/models
+    volumes:
+      - models:/app/models
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    # GPU support: uncomment to enable NVIDIA GPU for faster transcription
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
   # PostgreSQL database
   db:
     image: postgres:15-alpine

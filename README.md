@@ -141,22 +141,30 @@ For NVIDIA GPU support, ensure you have:
 ### Services
 
 The deployment includes:
-- **web**: Main web application (FastAPI)
+- **web**: Main web application (FastAPI) — http://localhost:8000
 - **worker**: Background worker for transcription and summarization
 - **db**: PostgreSQL database
-- **redis**: Redis for caching (optional)
+- **checker**: Real-time transcription checker demo — http://localhost:8001
+
+With HTTPS overlay (`docker-compose.https.yml`):
+- Main app: https://\<server-ip\> (port 443)
+- Checker demo: https://\<server-ip\>:8444 (HTTPS required for microphone access)
 
 ### Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SECRET_KEY` | - | Secret key for session signing |
+| `SECRET_KEY` | - | Secret key for session signing (required) |
 | `DATABASE_URL` | - | PostgreSQL connection URL |
 | `LLM_API_BASE_URL` | - | Local LLM server URL |
 | `LLM_MODEL_NAME` | default | Model name for summarization |
 | `WHISPER_MODEL_SIZE` | large | Whisper model (tiny/base/small/medium/large) |
-| `WHISPER_DEVICE` | cuda | Device for Whisper (cuda/cpu) |
+| `WHISPER_DEVICE` | cpu | Device for Whisper (cuda/cpu) |
 | `AUDIO_RETENTION_DAYS` | 30 | Days to keep audio files |
+| `APP_PORT` | 8000 | HTTP port for main app |
+| `CHECKER_PORT` | 8001 | HTTP port for checker demo |
+| `HTTPS_PORT` | 443 | HTTPS port for main app (with nginx overlay) |
+| `CHECKER_HTTPS_PORT` | 8444 | HTTPS port for checker demo (with nginx overlay) |
 
 ## Project Structure
 
