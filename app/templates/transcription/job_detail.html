@@ -48,6 +48,7 @@
                     コピー
                 </button>
                 <form action="/summary/api/transcription/{{ job.id }}/summarize" method="POST" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
                     <button type="submit" class="btn btn-primary text-sm">
                         要約
                     </button>

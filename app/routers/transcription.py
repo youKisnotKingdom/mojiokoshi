@@ -2,23 +2,22 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, limiter, verify_csrf_token
 from app.models import AudioFile, AudioSource, Summary, TranscriptionEngine, TranscriptionJob, TranscriptionStatus
 from app.models.user import User
 from app.schemas.transcription import TranscriptionJobResponse
 from app.services import storage
+from app.templating import templates
 
 settings = get_settings()
 router = APIRouter(prefix="/transcription", tags=["transcription"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("", response_class=HTMLResponse)
@@ -55,6 +54,7 @@ async def upload_page(
 
 
 @router.post("/upload")
+@limiter.limit("10/minute")
 async def upload_file(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
@@ -63,8 +63,14 @@ async def upload_file(
     engine: Annotated[str, Form()] = "faster_whisper",
     model_size: Annotated[str, Form()] = "large",
     language: Annotated[str | None, Form()] = None,
+    csrf_token: Annotated[str, Form()] = "",
 ):
     """Handle file upload and create transcription job."""
+    if not verify_csrf_token(csrf_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRFトークンが無効です",
+        )
     # Validate file
     if not file.filename:
         return templates.TemplateResponse(

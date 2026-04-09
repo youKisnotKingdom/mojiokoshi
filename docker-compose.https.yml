@@ -1,0 +1,33 @@
+# HTTPS オーバーライド
+# 使い方:
+#   # 1. 証明書を生成（初回のみ）
+#   bash scripts/generate_cert.sh 192.168.x.x
+#
+#   # 2. HTTPS 付きで起動
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+#
+#   # 3. HTTP のみに戻す場合
+#   docker compose up -d   （docker-compose.yml だけ使う）
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: mojiokoshi-nginx
+    ports:
+      - "80:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # web は外部ポートを閉じる（Nginx 経由のみに限定）
+  web:
+    ports: !reset []

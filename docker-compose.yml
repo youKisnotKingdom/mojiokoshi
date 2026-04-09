@@ -4,29 +4,63 @@ services:
   # Main web application
   web:
     build: .
+    image: mojiokoshi:latest
     container_name: mojiokoshi-web
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=postgresql://mojiokoshi:mojiokoshi@db:5432/mojiokoshi
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DATABASE_URL=postgresql://mojiokoshi:${POSTGRES_PASSWORD:-mojiokoshi}@db:5432/mojiokoshi
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
       - UPLOAD_DIR=/app/uploads
       - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
       - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
-      - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
       - AUDIO_RETENTION_DAYS=${AUDIO_RETENTION_DAYS:-30}
+      - ADMIN_USER_ID=${ADMIN_USER_ID:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
     volumes:
       - uploads:/app/uploads
+      - models:/app/models   # Whisper モデルキャッシュ
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
     restart: unless-stopped
-    # GPU support (uncomment for NVIDIA GPU)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Background worker for transcription and summarization
+  worker:
+    build: .
+    image: mojiokoshi:latest
+    container_name: mojiokoshi-worker
+    command: python -m app.services.worker
+    environment:
+      - DATABASE_URL=postgresql://mojiokoshi:${POSTGRES_PASSWORD:-mojiokoshi}@db:5432/mojiokoshi
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required.}
+      - UPLOAD_DIR=/app/uploads
+      - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+    volumes:
+      - uploads:/app/uploads
+      - models:/app/models   # web と同じモデルボリュームを共有
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    # GPU support: uncomment to enable NVIDIA GPU for faster transcription
     # deploy:
     #   resources:
     #     reservations:
@@ -35,45 +69,13 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-  # Background worker for transcription and summarization
-  worker:
-    build: .
-    container_name: mojiokoshi-worker
-    command: python -m app.services.worker
-    environment:
-      - DATABASE_URL=postgresql://mojiokoshi:mojiokoshi@db:5432/mojiokoshi
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - UPLOAD_DIR=/app/uploads
-      - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
-      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
-      - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}
-    volumes:
-      - uploads:/app/uploads
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    restart: unless-stopped
-    # GPU support (uncomment for NVIDIA GPU)
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
   # PostgreSQL database
   db:
     image: postgres:15-alpine
     container_name: mojiokoshi-db
     environment:
       - POSTGRES_USER=mojiokoshi
-      - POSTGRES_PASSWORD=mojiokoshi
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mojiokoshi}
       - POSTGRES_DB=mojiokoshi
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -84,15 +86,7 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Redis for caching (optional, for future use)
-  redis:
-    image: redis:7-alpine
-    container_name: mojiokoshi-redis
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
 volumes:
   uploads:
   postgres_data:
-  redis_data:
+  models:   # Whisper モデルファイル（インターネット環境で事前ダウンロード）

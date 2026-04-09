@@ -2,18 +2,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_admin_user, get_current_user
+from app.dependencies import get_current_admin_user, get_current_user, verify_csrf_token
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.services import auth as auth_service
+from app.templating import templates
 
 router = APIRouter(prefix="/admin/users", tags=["users"])
-
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("", response_class=HTMLResponse)
@@ -61,8 +59,11 @@ async def create_user(
     display_name: Annotated[str, Form()],
     password: Annotated[str, Form()],
     role: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
 ):
     """Create a new user."""
+    if not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRFトークンが無効です")
     try:
         user_role = UserRole(role)
     except ValueError:
@@ -120,8 +121,12 @@ async def update_user(
     display_name: Annotated[str, Form()],
     role: Annotated[str, Form()],
     is_active: Annotated[bool, Form()] = False,
+    csrf_token: Annotated[str, Form()] = "",
 ):
     """Update a user."""
+    if not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRFトークンが無効です")
+
     user = auth_service.get_user_by_user_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
@@ -173,8 +178,12 @@ async def reset_user_password(
     db: Annotated[Session, Depends(get_db)],
     admin: Annotated[User, Depends(get_current_admin_user)],
     new_password: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
 ):
     """Reset a user's password."""
+    if not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRFトークンが無効です")
+
     user = auth_service.get_user_by_user_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="ユーザーが見つかりません")

@@ -1,8 +1,12 @@
+import re
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.user import UserRole
+
+_PASSWORD_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$")
+_PASSWORD_HINT = "パスワードは8文字以上で、大文字・小文字・数字をそれぞれ1文字以上含める必要があります"
 
 
 class UserBase(BaseModel):
@@ -11,7 +15,14 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=4, max_length=100)
+    password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        if not _PASSWORD_PATTERN.match(v):
+            raise ValueError(_PASSWORD_HINT)
+        return v
 
 
 class UserUpdate(BaseModel):
@@ -22,7 +33,14 @@ class UserUpdate(BaseModel):
 
 class UserPasswordUpdate(BaseModel):
     current_password: str
-    new_password: str = Field(..., min_length=4, max_length=100)
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        if not _PASSWORD_PATTERN.match(v):
+            raise ValueError(_PASSWORD_HINT)
+        return v
 
 
 class UserResponse(UserBase):

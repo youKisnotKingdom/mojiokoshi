@@ -4,15 +4,14 @@ Summary router for managing summarization jobs.
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import get_settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, verify_csrf_token
 from app.models import PromptTemplate, Summary, SummaryStatus, TranscriptionJob, TranscriptionStatus
 from app.models.user import User
 from app.schemas.summary import (
@@ -23,10 +22,10 @@ from app.schemas.summary import (
     SummaryResponse,
 )
 from app.services import summarization
+from app.templating import templates
 
 settings = get_settings()
 router = APIRouter(prefix="/summary", tags=["summary"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/templates", response_class=HTMLResponse)
@@ -118,9 +117,12 @@ async def summarize_transcription(
     transcription_id: uuid.UUID,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    csrf_token: Annotated[str, Form()] = "",
     prompt_template_id: int | None = None,
 ):
     """Create a summary for a transcription (HTMX endpoint)."""
+    if not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRFトークンが無効です")
     # Verify transcription exists and is completed
     stmt = (
         select(TranscriptionJob)

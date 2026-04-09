@@ -1,7 +1,10 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_INSECURE_DEFAULT = "change-me-in-production"
 
 
 class Settings(BaseSettings):
@@ -14,13 +17,19 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "Mojiokoshi"
     debug: bool = False
-    secret_key: str = "change-me-in-production"
+    secret_key: str
+
+    @model_validator(mode="after")
+    def validate_secret_key(self) -> "Settings":
+        if not self.secret_key or self.secret_key == _INSECURE_DEFAULT:
+            raise ValueError(
+                "SECRET_KEY must be set to a secure random value. "
+                "Run: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        return self
 
     # Database
     database_url: str = "postgresql://mojiokoshi:mojiokoshi@localhost:5432/mojiokoshi"
-
-    # Redis
-    redis_url: str = "redis://localhost:6379/0"
 
     # Storage
     upload_dir: Path = Path("uploads")
@@ -39,7 +48,7 @@ class Settings(BaseSettings):
 
     # Transcription
     whisper_model_size: str = "large"
-    whisper_device: str = "cuda"
+    whisper_device: str = "cpu"
 
 
 @lru_cache

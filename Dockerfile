@@ -4,23 +4,20 @@ FROM node:20-slim AS tailwind-builder
 
 WORKDIR /build
 
-# Copy package files
-COPY package.json package-lock.json* ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
-# Copy Tailwind config and source
 COPY tailwind.config.js ./
 COPY static/src/input.css ./static/src/
 COPY app/templates ./app/templates/
 
-# Build CSS
 RUN npx tailwindcss -i ./static/src/input.css -o ./static/css/styles.css --minify
 
 
 # Stage 2: Main application
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install system dependencies (ffmpeg for audio processing)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
@@ -29,16 +26,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies (includes faster-whisper)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install faster-whisper with CUDA support (for GPU)
-# Note: For CPU-only, use: pip install faster-whisper
-RUN pip install --no-cache-dir faster-whisper
-
 # Copy application code
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini .
 COPY scripts ./scripts
 COPY static ./static
 
@@ -48,18 +43,14 @@ COPY --from=tailwind-builder /build/static/css/styles.css ./static/css/styles.cs
 # Create upload directory
 RUN mkdir -p /app/uploads
 
-# Make entrypoint executable
 RUN chmod +x scripts/entrypoint.sh
 
-# Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+# Whisper/HuggingFace モデルキャッシュをボリュームに向ける
+ENV HF_HOME=/app/models
 
-# Expose port
 EXPOSE 8000
 
-# Entrypoint for database initialization
 ENTRYPOINT ["scripts/entrypoint.sh"]
-
-# Default command (can be overridden)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

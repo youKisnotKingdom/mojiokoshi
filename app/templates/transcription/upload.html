@@ -16,6 +16,7 @@
     {% endif %}
 
     <form method="POST" action="/transcription/upload" enctype="multipart/form-data" class="card space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
         <div>
             <label for="file" class="label">音声ファイル</label>
             <div

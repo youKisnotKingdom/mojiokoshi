@@ -1,7 +1,10 @@
+import secrets
 from typing import Annotated
 
 from fastapi import Cookie, Depends, HTTPException, status
-from itsdangerous import BadSignature, URLSafeTimedSerializer
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -11,8 +14,31 @@ from app.services import auth as auth_service
 
 settings = get_settings()
 
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Session serializer
 serializer = URLSafeTimedSerializer(settings.secret_key)
+
+# CSRF serializer
+_csrf_serializer = URLSafeTimedSerializer(settings.secret_key, salt="csrf-token")
+CSRF_TOKEN_MAX_AGE = 60 * 60  # 1 hour
+
+
+def generate_csrf_token() -> str:
+    """Generate a signed, time-limited CSRF token."""
+    return _csrf_serializer.dumps(secrets.token_hex(16))
+
+
+def verify_csrf_token(token: str) -> bool:
+    """Verify that a CSRF token is valid and not expired."""
+    if not token:
+        return False
+    try:
+        _csrf_serializer.loads(token, max_age=CSRF_TOKEN_MAX_AGE)
+        return True
+    except (SignatureExpired, BadSignature, Exception):
+        return False
 
 SESSION_COOKIE_NAME = "session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 7  # 7 days

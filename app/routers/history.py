@@ -5,7 +5,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -13,9 +12,9 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import TranscriptionJob
 from app.models.user import User
+from app.templating import templates
 
 router = APIRouter(prefix="/history", tags=["history"])
-templates = Jinja2Templates(directory="app/templates")
 
 ITEMS_PER_PAGE = 20
 

@@ -196,17 +196,20 @@ async def merge_recording_chunks(
     stored_filename = f"recording_{session_id[:12]}.webm"
     output_path = upload_dir / stored_filename
 
-    # Simple concatenation - works for webm chunks
-    # For production, consider using ffmpeg for proper muxing
+    # Stream-copy chunks to avoid loading entire files into memory
+    BUFFER_SIZE = 64 * 1024  # 64 KB
     total_size = 0
     async with aiofiles.open(output_path, "wb") as outfile:
         for chunk_file in sorted(chunk_files):
             chunk_path = Path(chunk_file)
             if chunk_path.exists():
                 async with aiofiles.open(chunk_path, "rb") as infile:
-                    content = await infile.read()
-                    await outfile.write(content)
-                    total_size += len(content)
+                    while True:
+                        buf = await infile.read(BUFFER_SIZE)
+                        if not buf:
+                            break
+                        await outfile.write(buf)
+                        total_size += len(buf)
 
     return stored_filename, str(output_path), total_size
 

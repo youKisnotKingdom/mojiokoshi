@@ -40,6 +40,7 @@
         {% endif %}
 
         <form method="POST" action="{% if user %}/admin/users/{{ user.user_id }}{% else %}/admin/users/new{% endif %}" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
             <div>
                 <label for="display_name" class="label">表示名</label>
                 <input
@@ -60,10 +61,10 @@
                     id="password"
                     name="password"
                     class="input"
-                    minlength="4"
+                    minlength="8"
                     required
                 />
-                <p class="text-xs text-gray-500 mt-1">4文字以上</p>
+                <p class="text-xs text-gray-500 mt-1">8文字以上、英大文字・小文字・数字を含む</p>
             </div>
             {% endif %}
 
@@ -103,6 +104,7 @@
     <div class="card">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">パスワードリセット</h2>
         <form method="POST" action="/admin/users/{{ user.user_id }}/reset-password" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
             <div>
                 <label for="new_password" class="label">新しいパスワード</label>
                 <input
@@ -110,9 +112,10 @@
                     id="new_password"
                     name="new_password"
                     class="input"
-                    minlength="4"
+                    minlength="8"
                     required
                 />
+                <p class="text-xs text-gray-500 mt-1">8文字以上、英大文字・小文字・数字を含む</p>
             </div>
             <div class="flex justify-end">
                 <button type="submit" class="btn btn-secondary">

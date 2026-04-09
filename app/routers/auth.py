@@ -2,7 +2,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -12,14 +11,15 @@ from app.dependencies import (
     create_session_token,
     get_current_user,
     get_current_user_optional,
+    limiter,
+    verify_csrf_token,
 )
 from app.models.user import User
 from app.schemas.user import LoginRequest, LoginResponse, UserResponse
 from app.services import auth as auth_service
+from app.templating import templates
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -38,13 +38,21 @@ async def login_page(
 
 
 @router.post("/login")
+@limiter.limit("5/minute")
 async def login(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     user_id: Annotated[str, Form()],
     password: Annotated[str, Form()],
+    csrf_token: Annotated[str, Form()] = "",
 ):
     """Process login form."""
+    if not verify_csrf_token(csrf_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRFトークンが無効です",
+        )
+
     user = auth_service.authenticate_user(db, user_id, password)
 
     if not user:
