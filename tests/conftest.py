@@ -52,6 +52,19 @@ def db():
     connection.close()
 
 
+def pytest_addoption(parser):
+    parser.addoption("--run-e2e", action="store_true", default=False,
+                     help="実モデル・実LLMを使うE2Eテストを実行する")
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--run-e2e"):
+        skip = pytest.mark.skip(reason="--run-e2e フラグが必要")
+        for item in items:
+            if "e2e" in item.keywords:
+                item.add_marker(skip)
+
+
 @pytest.fixture(autouse=True)
 def isolate_rate_limiter():
     """Reset rate limiter storage after each test so limits don't bleed across tests."""
