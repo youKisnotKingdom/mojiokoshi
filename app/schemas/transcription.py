@@ -10,7 +10,7 @@ from app.schemas.audio import AudioFileResponse
 class TranscriptionJobCreate(BaseModel):
     audio_file_id: uuid.UUID
     engine: TranscriptionEngine = TranscriptionEngine.FASTER_WHISPER
-    model_size: str = "large"
+    model_size: str = "medium"
     language: str | None = None
 
 

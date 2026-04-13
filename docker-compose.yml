@@ -9,6 +9,7 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     environment:
+      - TZ=Asia/Tokyo
       - DATABASE_URL=postgresql://mojiokoshi:${POSTGRES_PASSWORD:-mojiokoshi}@db:5432/mojiokoshi
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
       - UPLOAD_DIR=/app/uploads
@@ -41,6 +42,7 @@ services:
     container_name: mojiokoshi-worker
     command: python -m app.services.worker
     environment:
+      - TZ=Asia/Tokyo
       - DATABASE_URL=postgresql://mojiokoshi:${POSTGRES_PASSWORD:-mojiokoshi}@db:5432/mojiokoshi
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required.}
       - UPLOAD_DIR=/app/uploads
@@ -82,6 +84,7 @@ services:
     ports:
       - "${CHECKER_PORT:-8001}:8001"
     environment:
+      - TZ=Asia/Tokyo
       - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}

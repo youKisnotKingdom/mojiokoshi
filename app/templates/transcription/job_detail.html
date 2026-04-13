@@ -82,9 +82,8 @@
                     {% endif %}
                 </div>
                 {% if summary.status.value == 'completed' and summary.result_text %}
-                <div class="text-sm text-gray-700 line-clamp-3">
-                    {{ summary.result_text[:300] }}{% if summary.result_text|length > 300 %}...{% endif %}
-                </div>
+                <div class="summary-preview prose prose-sm max-w-none text-gray-700 line-clamp-3"
+                     data-raw="{{ summary.result_text | e }}"></div>
                 <a href="/summary/job/{{ summary.id }}" class="text-sm text-primary-600 hover:text-primary-700 mt-2 inline-block">
                     要約全文を表示 &rarr;
                 </a>
@@ -106,7 +105,15 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
+// 要約プレビューを Markdown レンダリング
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.summary-preview[data-raw]').forEach(el => {
+        el.innerHTML = marked.parse(el.dataset.raw);
+    });
+});
+
 function copyToClipboard() {
     const text = document.getElementById('result-text').textContent;
     navigator.clipboard.writeText(text).then(() => {

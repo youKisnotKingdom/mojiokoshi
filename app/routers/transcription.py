@@ -61,7 +61,7 @@ async def upload_file(
     current_user: Annotated[User, Depends(get_current_user)],
     file: Annotated[UploadFile, File()],
     engine: Annotated[str, Form()] = "faster_whisper",
-    model_size: Annotated[str, Form()] = "large",
+    model_size: Annotated[str, Form()] = "medium",
     language: Annotated[str | None, Form()] = None,
     csrf_token: Annotated[str, Form()] = "",
 ):

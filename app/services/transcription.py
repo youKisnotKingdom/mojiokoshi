@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 _whisper_models: dict[str, object] = {}
 
 
-def get_whisper_model(model_size: str = "large", device: str = "auto"):
+def get_whisper_model(model_size: str = "medium", device: str = "auto"):
     """
     Get or create a faster-whisper model instance.
     Models are cached to avoid reloading.
@@ -49,7 +49,7 @@ def get_whisper_model(model_size: str = "large", device: str = "auto"):
 
 def transcribe_audio_sync(
     audio_path: str,
-    model_size: str = "large",
+    model_size: str = "medium",
     language: str | None = None,
     device: str = "auto",
 ) -> Generator[dict, None, None]:
@@ -93,7 +93,7 @@ def transcribe_audio_sync(
 
 async def transcribe_audio(
     audio_path: str,
-    model_size: str = "large",
+    model_size: str = "medium",
     language: str | None = None,
     device: str = "auto",
 ) -> tuple[str, list[dict]]:

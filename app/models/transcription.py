@@ -49,7 +49,7 @@ class TranscriptionJob(Base):
     engine: Mapped[TranscriptionEngine] = mapped_column(
         Enum(TranscriptionEngine), default=TranscriptionEngine.FASTER_WHISPER, nullable=False
     )
-    model_size: Mapped[str] = mapped_column(String(50), default="large", nullable=False)
+    model_size: Mapped[str] = mapped_column(String(50), default="medium", nullable=False)
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)  # None = auto-detect
 
     # Results

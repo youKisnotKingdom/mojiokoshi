@@ -297,7 +297,7 @@ async def finalize_recording(
         audio_file_id=audio_file.id,
         user_id=user.id,
         engine=TranscriptionEngine.FASTER_WHISPER,
-        model_size="large",
+        model_size="medium",
     )
     db.add(job)
     db.commit()
