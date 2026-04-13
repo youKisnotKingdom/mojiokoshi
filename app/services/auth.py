@@ -43,13 +43,16 @@ def get_users(
     return list(db.execute(stmt).scalars().all())
 
 
-def create_user(db: Session, user_data: UserCreate) -> User:
-    """Create a new user with a generated 6-digit ID."""
-    # Generate unique user_id
-    while True:
-        user_id = User.generate_user_id()
-        if not get_user_by_user_id(db, user_id):
-            break
+def create_user(db: Session, user_data: UserCreate, user_id: str | None = None) -> User:
+    """Create a new user. user_id is auto-generated if not specified."""
+    if user_id:
+        if not user_id.isdigit() or len(user_id) != 6:
+            raise ValueError("user_id は6桁の数字で指定してください")
+    else:
+        while True:
+            user_id = User.generate_user_id()
+            if not get_user_by_user_id(db, user_id):
+                break
 
     user = User(
         user_id=user_id,
@@ -107,11 +110,28 @@ def update_user(
     return user
 
 
-def create_admin_user(db: Session, display_name: str, password: str) -> User:
-    """Create an admin user."""
+def create_admin_user(
+    db: Session,
+    display_name: str,
+    password: str,
+    user_id: str | None = None,
+    overwrite: bool = False,
+) -> User:
+    """Create an admin user. If overwrite=True and user_id exists, reset the password."""
+    if overwrite and user_id:
+        existing = get_user_by_user_id(db, user_id)
+        if existing:
+            existing.password_hash = get_password_hash(password)
+            existing.display_name = display_name
+            existing.role = UserRole.ADMIN
+            existing.is_active = True
+            db.commit()
+            db.refresh(existing)
+            return existing
+
     user_data = UserCreate(
         display_name=display_name,
         password=password,
         role=UserRole.ADMIN,
     )
-    return create_user(db, user_data)
+    return create_user(db, user_data, user_id=user_id)

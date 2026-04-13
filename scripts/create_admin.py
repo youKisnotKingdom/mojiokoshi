@@ -16,9 +16,10 @@ from app.services import auth as auth_service
 
 def main():
     parser = argparse.ArgumentParser(description="Create an admin user")
-    parser.add_argument("--admin-id", type=str, help="Desired user ID (6 digits, auto-generated if omitted)")
+    parser.add_argument("--admin-id", type=str, help="User ID (6 digits, auto-generated if omitted)")
     parser.add_argument("--admin-password", type=str, help="Password (interactive prompt if omitted)")
     parser.add_argument("--display-name", type=str, default="Administrator", help="Display name")
+    parser.add_argument("--force", action="store_true", help="既存のユーザーIDがあればパスワード・ロールを上書き")
     args = parser.parse_args()
 
     display_name = args.display_name
@@ -38,7 +39,11 @@ def main():
 
     db = SessionLocal()
     try:
-        user = auth_service.create_admin_user(db, display_name, password)
+        user = auth_service.create_admin_user(
+            db, display_name, password,
+            user_id=args.admin_id,
+            overwrite=args.force,
+        )
         print()
         print("=" * 50)
         print("Admin user created successfully!")
