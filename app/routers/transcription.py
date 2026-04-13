@@ -240,6 +240,47 @@ async def job_progress_partial(
     )
 
 
+@router.post("/job/{job_id}/delete")
+async def delete_job(
+    request: Request,
+    job_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    csrf_token: Annotated[str, Form()] = "",
+):
+    """Delete a transcription job and its associated audio file."""
+    from fastapi.responses import RedirectResponse
+
+    if not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRFトークンが無効です")
+
+    stmt = (
+        select(TranscriptionJob)
+        .where(TranscriptionJob.id == job_id)
+        .where(TranscriptionJob.user_id == current_user.id)
+    )
+    job = db.execute(stmt).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="ジョブが見つかりません")
+
+    # Delete associated audio file (cascades to job and summaries)
+    if job.audio_file:
+        audio_file = job.audio_file
+        # Try to remove the actual file
+        import os
+        try:
+            if os.path.exists(audio_file.file_path):
+                os.remove(audio_file.file_path)
+        except OSError:
+            pass
+        db.delete(audio_file)
+    else:
+        db.delete(job)
+
+    db.commit()
+    return RedirectResponse(url="/history", status_code=303)
+
+
 # API endpoints
 @router.get("/api/jobs", response_model=list[TranscriptionJobResponse])
 async def get_jobs(

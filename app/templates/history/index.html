@@ -86,9 +86,18 @@
                             {{ job.created_at.strftime('%Y/%m/%d %H:%M') }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <a href="/transcription/job/{{ job.id }}" class="text-primary-600 hover:text-primary-700">
-                                表示
-                            </a>
+                            <div class="flex items-center space-x-3">
+                                <a href="/transcription/job/{{ job.id }}" class="text-primary-600 hover:text-primary-700">
+                                    表示
+                                </a>
+                                <form action="/transcription/job/{{ job.id }}/delete" method="POST"
+                                      onsubmit="return confirm('このジョブと音声ファイルを削除しますか？この操作は元に戻せません。')">
+                                    <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-700">
+                                        削除
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
