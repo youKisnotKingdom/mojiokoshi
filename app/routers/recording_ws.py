@@ -198,10 +198,10 @@ async def recording_websocket(
                             "session_id": str(recording_session.id),
                         })
 
-                    # Queue transcription for this chunk (streaming)
-                    # In a real implementation, this would trigger the transcription service
-                    # For now, we'll send a placeholder
-                    # await transcribe_chunk_streaming(session_id, audio_bytes, chunk_index)
+                    # チャンクをリアルタイムで文字起こし
+                    asyncio.create_task(
+                        transcribe_and_send(session_id, chunk_path, chunk_index)
+                    )
 
                 elif msg_type == "pause":
                     recording_session.status = RecordingStatus.PAUSED
@@ -306,3 +306,26 @@ async def finalize_recording(
     await storage.cleanup_recording_chunks(chunk_files)
 
     return job
+
+
+async def transcribe_and_send(session_id: str, chunk_path: str, chunk_index: int):
+    """チャンクファイルをWhisperで文字起こししてWebSocketで送信する"""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from app.services.transcription import transcribe_audio
+        text, _ = await transcribe_audio(
+            chunk_path,
+            model_size=settings.whisper_model_size,
+            language=settings.whisper_language,
+            device=settings.whisper_device,
+        )
+        if text:
+            await manager.send_message(session_id, {
+                "type": "transcription",
+                "text": text,
+                "chunk_index": chunk_index,
+                "is_partial": False,
+            })
+    except Exception as e:
+        logger.warning("リアルタイム文字起こし失敗 (chunk %d): %s", chunk_index, e)
