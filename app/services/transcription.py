@@ -148,8 +148,8 @@ async def process_transcription_job(
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         # Determine model and device
-        model_size = job.model_size or "large"
-        language = job.language  # None means auto-detect
+        model_size = job.model_size or settings.whisper_model_size
+        language = job.language or settings.whisper_language  # デフォルト: ja
         device = settings.whisper_device
 
         logger.info(f"Starting transcription job {job.id}: {audio_path}")

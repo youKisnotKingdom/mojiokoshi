@@ -15,8 +15,9 @@ services:
       - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
-      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-medium}
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ja}
       - AUDIO_RETENTION_DAYS=${AUDIO_RETENTION_DAYS:-30}
       - ADMIN_USER_ID=${ADMIN_USER_ID:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
@@ -46,8 +47,9 @@ services:
       - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
-      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-medium}
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ja}
       - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:
       - uploads:/app/uploads
@@ -83,8 +85,9 @@ services:
       - LLM_API_BASE_URL=${LLM_API_BASE_URL:-http://host.docker.internal:8080/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
-      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-medium}
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ja}
       - HF_HOME=/app/models
       - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:

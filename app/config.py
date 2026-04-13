@@ -47,8 +47,9 @@ class Settings(BaseSettings):
     llm_timeout: int = 120
 
     # Transcription
-    whisper_model_size: str = "large"
+    whisper_model_size: str = "medium"
     whisper_device: str = "cpu"
+    whisper_language: str = "ja"
 
 
 @lru_cache

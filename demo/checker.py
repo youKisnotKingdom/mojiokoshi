@@ -29,8 +29,9 @@ from fastapi.responses import HTMLResponse
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
+WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "medium")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")
+WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "ja")
 LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://localhost:11434/v1")
 LLM_MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "default")
 
@@ -83,6 +84,7 @@ def transcribe_pcm(pcm_bytes: bytes) -> str:
     try:
         segments, info = model.transcribe(
             tmp_path,
+            language=WHISPER_LANGUAGE,
             beam_size=3,
             vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 300},
