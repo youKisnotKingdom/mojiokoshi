@@ -23,9 +23,9 @@ echo "Running database migrations..."
 alembic upgrade head
 echo "Migrations applied."
 
-# Create admin user if specified
+# Create admin user if specified (skip if already exists)
 if [ -n "$ADMIN_USER_ID" ] && [ -n "$ADMIN_PASSWORD" ]; then
-    echo "Creating admin user..."
+    echo "Creating admin user (skip if exists)..."
     python scripts/create_admin.py --admin-id "$ADMIN_USER_ID" --admin-password "$ADMIN_PASSWORD"
 fi
 

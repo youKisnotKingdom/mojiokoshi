@@ -39,6 +39,13 @@ def main():
 
     db = SessionLocal()
     try:
+        # 既に存在する場合は --force なしでスキップ
+        if args.admin_id and not args.force:
+            existing = auth_service.get_user_by_user_id(db, args.admin_id)
+            if existing:
+                print(f"Admin user {args.admin_id} already exists. Use --force to overwrite.")
+                return
+
         user = auth_service.create_admin_user(
             db, display_name, password,
             user_id=args.admin_id,
