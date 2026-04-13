@@ -108,8 +108,8 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 // 要約プレビューを Markdown レンダリング
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.summary-preview[data-raw]').forEach(el => {
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.summary-preview[data-raw]').forEach(function(el) {
         el.innerHTML = marked.parse(el.dataset.raw);
     });
 });

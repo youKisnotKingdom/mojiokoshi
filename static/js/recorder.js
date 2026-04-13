@@ -54,7 +54,7 @@ class AudioRecorder {
                 'audio/ogg;codecs=opus',
                 'audio/mp4',
             ].find(t => MediaRecorder.isTypeSupported(t)) || '';
-            this.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+            this.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType: mimeType } : {});
 
             // Handle data available
             this.mediaRecorder.ondataavailable = (event) => {

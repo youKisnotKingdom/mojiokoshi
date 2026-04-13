@@ -80,20 +80,21 @@
 {% endblock %}
 
 {% block scripts %}
+<script type="application/json" id="summary-data">{{ summary.result_text | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-const rawText = {{ summary.result_text | tojson }};
+var rawText = JSON.parse(document.getElementById('summary-data').textContent || 'null');
 
-// Markdown レンダリング
-document.addEventListener('DOMContentLoaded', () => {
-    const el = document.getElementById('summary-body');
+document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('summary-body');
     if (el && rawText) {
         el.innerHTML = marked.parse(rawText);
     }
 });
 
 function copyToClipboard() {
-    navigator.clipboard.writeText(rawText).then(() => {
+    if (!rawText) return;
+    navigator.clipboard.writeText(rawText).then(function() {
         alert('クリップボードにコピーしました！');
     });
 }
