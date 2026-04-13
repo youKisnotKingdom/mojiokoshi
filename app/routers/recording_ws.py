@@ -173,7 +173,6 @@ async def recording_websocket(
                     chunk_record = RecordingChunk(
                         session_id=recording_session.id,
                         chunk_index=chunk_index,
-                        stored_filename=chunk_filename,
                         file_path=chunk_path,
                         file_size=len(audio_bytes),
                         duration_seconds=chunk_duration,
