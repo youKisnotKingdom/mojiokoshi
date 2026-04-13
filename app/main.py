@@ -46,6 +46,12 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# nginxリバースプロキシ経由のスキーム・ホスト情報を信頼する
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
