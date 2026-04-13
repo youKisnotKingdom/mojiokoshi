@@ -60,14 +60,13 @@ services:
       options:
         max-size: "100m"
         max-file: "5"
-    # GPU support: uncomment to enable NVIDIA GPU for faster transcription
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   # Real-time transcription checker demo
   checker:
@@ -92,14 +91,13 @@ services:
       options:
         max-size: "100m"
         max-file: "5"
-    # GPU support: uncomment to enable NVIDIA GPU for faster transcription
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   # PostgreSQL database
   db:
