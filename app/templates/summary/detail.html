@@ -35,9 +35,7 @@
             </p>
         </div>
         <div class="p-6">
-            <div class="prose max-w-none">
-                {{ summary.result_text | replace('\n', '<br>') | safe }}
-            </div>
+            <div id="summary-body" class="prose max-w-none"></div>
         </div>
         <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
             <div class="flex items-center space-x-4">
@@ -82,10 +80,20 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
+const rawText = {{ summary.result_text | tojson }};
+
+// Markdown レンダリング
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('summary-body');
+    if (el && rawText) {
+        el.innerHTML = marked.parse(rawText);
+    }
+});
+
 function copyToClipboard() {
-    const text = `{{ summary.result_text | replace("'", "\\'") | replace('\n', '\\n') }}`;
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText(rawText).then(() => {
         alert('クリップボードにコピーしました！');
     });
 }
