@@ -84,6 +84,7 @@ class RecordingChunk(Base):
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     duration_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    transcription_text: Mapped[str | None] = mapped_column(String, nullable=True)
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -184,33 +184,67 @@ async def merge_recording_chunks(
     session_id: str,
 ) -> tuple[str, str, int]:
     """
-    Merge recording chunks into a single audio file.
+    Merge recording chunks into a single audio file using ffmpeg.
 
-    For webm/opus files, we concatenate the chunks.
-    In a production environment, you might want to use ffmpeg for proper merging.
+    Each chunk from the browser already contains a webm initialization segment,
+    so we use ffmpeg's concat demuxer to properly merge them.
 
     Returns:
         Tuple of (stored_filename, file_path, file_size)
     """
+    import asyncio
+    import tempfile
+
     upload_dir = get_date_based_dir(get_upload_dir())
     stored_filename = f"recording_{session_id[:12]}.webm"
     output_path = upload_dir / stored_filename
 
-    # Stream-copy chunks to avoid loading entire files into memory
-    BUFFER_SIZE = 64 * 1024  # 64 KB
-    total_size = 0
-    async with aiofiles.open(output_path, "wb") as outfile:
-        for chunk_file in sorted(chunk_files):
-            chunk_path = Path(chunk_file)
-            if chunk_path.exists():
-                async with aiofiles.open(chunk_path, "rb") as infile:
-                    while True:
-                        buf = await infile.read(BUFFER_SIZE)
-                        if not buf:
-                            break
-                        await outfile.write(buf)
-                        total_size += len(buf)
+    sorted_chunks = sorted(f for f in chunk_files if Path(f).exists())
 
+    if not sorted_chunks:
+        output_path.touch()
+        return stored_filename, str(output_path), 0
+
+    if len(sorted_chunks) == 1:
+        # Single chunk: just copy
+        shutil.copy2(sorted_chunks[0], output_path)
+        total_size = output_path.stat().st_size
+        return stored_filename, str(output_path), total_size
+
+    # Write ffmpeg concat list file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        concat_list_path = f.name
+        for chunk in sorted_chunks:
+            # ffmpeg concat format requires escaped paths
+            escaped = chunk.replace("'", "'\\''")
+            f.write(f"file '{escaped}'\n")
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", concat_list_path,
+            "-c", "copy",
+            str(output_path),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            # Fallback: raw concatenation
+            BUFFER_SIZE = 64 * 1024
+            async with aiofiles.open(output_path, "wb") as outfile:
+                for chunk_file in sorted_chunks:
+                    async with aiofiles.open(chunk_file, "rb") as infile:
+                        while True:
+                            buf = await infile.read(BUFFER_SIZE)
+                            if not buf:
+                                break
+                            await outfile.write(buf)
+    finally:
+        Path(concat_list_path).unlink(missing_ok=True)
+
+    total_size = output_path.stat().st_size if output_path.exists() else 0
     return stored_filename, str(output_path), total_size
 
 

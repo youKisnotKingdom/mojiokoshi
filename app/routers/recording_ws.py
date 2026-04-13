@@ -182,6 +182,8 @@ async def recording_websocket(
                     # Update session
                     recording_session.chunk_count = chunk_index + 1
                     recording_session.total_duration_seconds = total_duration
+                    db.flush()  # chunk_record.id を取得するため
+                    chunk_record_id = chunk_record.id
                     db.commit()
 
                     # Send confirmation
@@ -199,7 +201,7 @@ async def recording_websocket(
 
                     # チャンクをリアルタイムで文字起こし
                     asyncio.create_task(
-                        transcribe_and_send(session_id, chunk_path, chunk_index)
+                        transcribe_and_send(session_id, chunk_path, chunk_index, chunk_record_id)
                     )
 
                 elif msg_type == "pause":
@@ -307,11 +309,12 @@ async def finalize_recording(
     return job
 
 
-async def transcribe_and_send(session_id: str, chunk_path: str, chunk_index: int):
-    """チャンクファイルをWhisperで文字起こししてWebSocketで送信する"""
+async def transcribe_and_send(session_id: str, chunk_path: str, chunk_index: int, chunk_db_id):
+    """チャンクファイルをWhisperで文字起こししてWebSocketで送信・DBに保存する"""
     import logging
     logger = logging.getLogger(__name__)
     try:
+        from app.database import SessionLocal
         from app.services.transcription import transcribe_audio
         text, _ = await transcribe_audio(
             chunk_path,
@@ -320,6 +323,18 @@ async def transcribe_and_send(session_id: str, chunk_path: str, chunk_index: int
             device=settings.whisper_device,
         )
         if text:
+            # DBに保存
+            db = SessionLocal()
+            try:
+                from app.models import RecordingChunk
+                chunk = db.get(RecordingChunk, chunk_db_id)
+                if chunk:
+                    chunk.transcription_text = text
+                    db.commit()
+            finally:
+                db.close()
+
+            # WebSocketで送信（接続が残っていれば）
             await manager.send_message(session_id, {
                 "type": "transcription",
                 "text": text,

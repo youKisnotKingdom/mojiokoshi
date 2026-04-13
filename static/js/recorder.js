@@ -129,7 +129,7 @@ class AudioRecorder {
 
         return new Promise((resolve) => {
             this.mediaRecorder.onstop = async () => {
-                // Upload final chunk
+                // Upload final chunk and wait for server confirmation
                 await this.uploadChunk(true);
 
                 // Stop all tracks
@@ -140,7 +140,24 @@ class AudioRecorder {
                     clearInterval(this.timerInterval);
                 }
 
-                // Close WebSocket
+                // Wait for recording_complete from server (up to 5s) then close WebSocket
+                await new Promise((wsResolve) => {
+                    const timeout = setTimeout(() => wsResolve(), 5000);
+                    if (this.ws) {
+                        const origOnMessage = this.ws.onmessage;
+                        this.ws.onmessage = (event) => {
+                            if (origOnMessage) origOnMessage(event);
+                            const msg = JSON.parse(event.data);
+                            if (msg.type === 'recording_complete') {
+                                clearTimeout(timeout);
+                                wsResolve();
+                            }
+                        };
+                    } else {
+                        wsResolve();
+                    }
+                });
+
                 if (this.ws) {
                     this.ws.close();
                 }
@@ -254,17 +271,20 @@ class AudioRecorder {
 
         // Send via WebSocket if connected
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                this.ws.send(JSON.stringify({
-                    type: 'chunk',
-                    chunk_index: this.chunkIndex,
-                    is_final: isFinal,
-                    data: reader.result.split(',')[1] // Base64 data
-                }));
-                this.chunkIndex++;
-            };
-            reader.readAsDataURL(blob);
+            await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    this.ws.send(JSON.stringify({
+                        type: 'chunk',
+                        chunk_index: this.chunkIndex,
+                        is_final: isFinal,
+                        data: reader.result.split(',')[1] // Base64 data
+                    }));
+                    this.chunkIndex++;
+                    resolve();
+                };
+                reader.readAsDataURL(blob);
+            });
         } else {
             // Fallback: save to IndexedDB for later upload
             await this.saveToIndexedDB(blob);
