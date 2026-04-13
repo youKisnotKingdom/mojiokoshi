@@ -48,9 +48,11 @@ services:
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
       - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+      - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:
       - uploads:/app/uploads
       - models:/app/models   # web と同じモデルボリュームを共有
+      - /usr/local/lib/ollama/cuda_v12:/usr/local/lib/ollama/cuda_v12:ro
     depends_on:
       db:
         condition: service_healthy
@@ -84,8 +86,10 @@ services:
       - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large}
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
       - HF_HOME=/app/models
+      - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:
       - models:/app/models
+      - /usr/local/lib/ollama/cuda_v12:/usr/local/lib/ollama/cuda_v12:ro
     restart: unless-stopped
     logging:
       driver: "json-file"
