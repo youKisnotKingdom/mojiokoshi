@@ -22,9 +22,11 @@ services:
       - AUDIO_RETENTION_DAYS=${AUDIO_RETENTION_DAYS:-30}
       - ADMIN_USER_ID=${ADMIN_USER_ID:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:
       - uploads:/app/uploads
       - models:/app/models   # Whisper モデルキャッシュ
+      - /usr/local/lib/ollama/cuda_v12:/usr/local/lib/ollama/cuda_v12:ro
     depends_on:
       db:
         condition: service_healthy
@@ -34,6 +36,13 @@ services:
       options:
         max-size: "100m"
         max-file: "5"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   # Background worker for transcription and summarization
   worker:
