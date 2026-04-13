@@ -97,29 +97,27 @@ class TestLogout:
 
 
 class TestPasswordValidation:
-    def test_short_password_rejected(self):
+    def test_empty_password_rejected(self):
         from pydantic import ValidationError
         from app.schemas.user import UserCreate
         from app.models.user import UserRole
 
         with pytest.raises(ValidationError):
-            UserCreate(display_name="Test", password="Ab1", role=UserRole.USER)
+            UserCreate(display_name="Test", password="   ", role=UserRole.USER)
 
-    def test_no_uppercase_rejected(self):
-        from pydantic import ValidationError
+    def test_short_password_accepted(self):
         from app.schemas.user import UserCreate
         from app.models.user import UserRole
 
-        with pytest.raises(ValidationError):
-            UserCreate(display_name="Test", password="password1", role=UserRole.USER)
+        user = UserCreate(display_name="Test", password="abc", role=UserRole.USER)
+        assert user.password == "abc"
 
-    def test_no_digit_rejected(self):
-        from pydantic import ValidationError
+    def test_no_uppercase_accepted(self):
         from app.schemas.user import UserCreate
         from app.models.user import UserRole
 
-        with pytest.raises(ValidationError):
-            UserCreate(display_name="Test", password="Password", role=UserRole.USER)
+        user = UserCreate(display_name="Test", password="password1", role=UserRole.USER)
+        assert user.password == "password1"
 
     def test_valid_password_accepted(self):
         from app.schemas.user import UserCreate
