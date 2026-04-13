@@ -7,6 +7,7 @@ class AudioRecorder {
     constructor() {
         this.mediaRecorder = null;
         this.audioChunks = [];
+        this.initChunk = null;  // webm 初期化セグメント（ヘッダー）
         this.isRecording = false;
         this.isPaused = false;
         this.sessionId = null;
@@ -59,7 +60,12 @@ class AudioRecorder {
             // Handle data available
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
-                    this.audioChunks.push(event.data);
+                    // 最初のチャンクは webm ヘッダーを含む初期化セグメント
+                    if (this.initChunk === null) {
+                        this.initChunk = event.data;
+                    } else {
+                        this.audioChunks.push(event.data);
+                    }
                 }
             };
 
@@ -237,9 +243,13 @@ class AudioRecorder {
     }
 
     async uploadChunk(isFinal) {
-        if (this.audioChunks.length === 0) return;
+        if (this.audioChunks.length === 0 && !isFinal) return;
 
-        const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        // 初期化セグメント（ヘッダー）を先頭に付加して有効な webm ファイルにする
+        const parts = this.initChunk
+            ? [this.initChunk, ...this.audioChunks]
+            : [...this.audioChunks];
+        const blob = new Blob(parts, { type: 'audio/webm' });
         this.audioChunks = [];
 
         // Send via WebSocket if connected
