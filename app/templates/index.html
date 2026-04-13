@@ -2,14 +2,11 @@
 
 {% block content %}
 <div class="text-center py-12">
-    <h1 class="text-4xl font-bold text-gray-900 mb-4">
+    <h1 class="text-4xl font-bold text-gray-900 mb-12">
         Mojiokoshi
     </h1>
-    <p class="text-xl text-gray-600 mb-8">
-        音声文字起こし＆要約サービス
-    </p>
 
-    <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mt-12">
+    <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
         <div class="card hover:shadow-lg transition-shadow">
             <div class="text-primary-600 mb-4">
                 <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -38,17 +35,6 @@
             <a href="/transcription/upload" class="btn btn-primary inline-block">
                 音声をアップロード
             </a>
-        </div>
-    </div>
-
-    <div class="mt-16">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">主な機能</h3>
-        <div class="flex flex-wrap justify-center gap-4 text-sm text-gray-600">
-            <span class="bg-gray-100 px-3 py-1 rounded-full">Whisper音声認識</span>
-            <span class="bg-gray-100 px-3 py-1 rounded-full">リアルタイム文字起こし</span>
-            <span class="bg-gray-100 px-3 py-1 rounded-full">LLM要約</span>
-            <span class="bg-gray-100 px-3 py-1 rounded-full">複数フォーマット対応</span>
-            <span class="bg-gray-100 px-3 py-1 rounded-full">オンプレミス対応</span>
         </div>
     </div>
 </div>
