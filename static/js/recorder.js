@@ -15,7 +15,7 @@ class AudioRecorder {
         this.pausedTime = 0;
         this.timerInterval = null;
         this.ws = null;
-        this.chunkInterval = 30000; // 30 seconds
+        this.chunkInterval = 10000; // 10 seconds
 
         // DOM elements
         this.timerEl = document.getElementById('timer');
@@ -47,10 +47,14 @@ class AudioRecorder {
             // Request microphone access
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            // Create MediaRecorder
-            this.mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'audio/webm;codecs=opus'
-            });
+            // Create MediaRecorder (ブラウザ互換のmimeTypeを選択)
+            const mimeType = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/mp4',
+            ].find(t => MediaRecorder.isTypeSupported(t)) || '';
+            this.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
 
             // Handle data available
             this.mediaRecorder.ondataavailable = (event) => {
@@ -333,7 +337,7 @@ class AudioRecorder {
         if (connected) {
             this.connectionDot.classList.remove('bg-gray-400', 'bg-red-400');
             this.connectionDot.classList.add('bg-green-400');
-            this.connectionText.textContent = '接続中';
+            this.connectionText.textContent = '接続済み';
         } else {
             this.connectionDot.classList.remove('bg-gray-400', 'bg-green-400');
             this.connectionDot.classList.add('bg-red-400');
