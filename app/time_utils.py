@@ -1,12 +1,11 @@
-from datetime import UTC, datetime
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 
-TOKYO_TZ = ZoneInfo("Asia/Tokyo")
+TOKYO_TZ = timezone(timedelta(hours=9), name="JST")
 
 
 def utc_now() -> datetime:
     """Return a timezone-aware UTC timestamp."""
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def tokyo_now() -> datetime:
@@ -23,5 +22,5 @@ def to_tokyo(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
+        dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(TOKYO_TZ)
