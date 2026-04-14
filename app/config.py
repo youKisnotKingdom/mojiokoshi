@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     app_name: str = "Mojiokoshi"
     debug: bool = False
     secret_key: str
+    allowed_hosts: str = "localhost,127.0.0.1,::1"
 
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":

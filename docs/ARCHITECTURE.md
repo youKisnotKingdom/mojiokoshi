@@ -289,6 +289,8 @@ npm run watch:css
 | API Docs | http://localhost:8000/docs |
 | ReDoc | http://localhost:8000/redoc |
 
+上記はローカル開発時のURLです。オンプレ導入時は `https://<server-ip>` または `http://<server-ip>:8000` を使用します。
+
 ---
 
 ## 本番環境デプロイ
@@ -423,7 +425,7 @@ python -m vllm.entrypoints.openai.api_server \
 
 `.env`設定:
 ```
-LLM_API_BASE_URL=http://192.168.1.100:8080/v1
+LLM_API_BASE_URL=http://<llm-server-ip>:8080/v1
 LLM_MODEL_NAME=mistralai/Mistral-7B-Instruct-v0.2
 ```
 
@@ -437,7 +439,7 @@ ollama pull mistral
 
 `.env`設定:
 ```
-LLM_API_BASE_URL=http://192.168.1.100:11434/v1
+LLM_API_BASE_URL=http://<llm-server-ip>:11434/v1
 LLM_MODEL_NAME=mistral
 ```
 

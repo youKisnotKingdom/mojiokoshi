@@ -2,13 +2,13 @@
 Summarization service using OpenAI-compatible LLM API.
 """
 import logging
-from datetime import datetime
 
 import httpx
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import Summary, SummaryStatus, TranscriptionJob
+from app.time_utils import utc_now
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -122,7 +122,7 @@ async def process_summary(
     try:
         # Update status
         summary.status = SummaryStatus.PROCESSING
-        summary.started_at = datetime.now()
+        summary.started_at = utc_now()
         db.commit()
 
         # Get transcription text
@@ -151,7 +151,7 @@ async def process_summary(
         # Save result
         summary.result_text = result
         summary.status = SummaryStatus.COMPLETED
-        summary.completed_at = datetime.now()
+        summary.completed_at = utc_now()
         db.commit()
 
         logger.info(f"Completed summary {summary.id}")
@@ -161,7 +161,7 @@ async def process_summary(
         logger.error(f"Summary {summary.id} failed: {e}")
         summary.status = SummaryStatus.FAILED
         summary.error_message = str(e)
-        summary.completed_at = datetime.now()
+        summary.completed_at = utc_now()
         db.commit()
         return False
 

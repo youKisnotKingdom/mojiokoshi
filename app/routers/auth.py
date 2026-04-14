@@ -70,29 +70,38 @@ async def login(
     # Create session and redirect
     response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     session_token = create_session_token(user.id)
+    secure_cookie = request.url.scheme == "https"
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
         max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="lax",
+        secure=secure_cookie,
+        path="/",
     )
 
     return response
 
 
 @router.post("/logout")
-async def logout():
+async def logout(request: Request):
     """Logout and clear session."""
     response = RedirectResponse(url="/auth/login", status_code=status.HTTP_302_FOUND)
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        path="/",
+        secure=request.url.scheme == "https",
+        httponly=True,
+        samesite="lax",
+    )
     return response
 
 
 @router.get("/logout")
-async def logout_get():
+async def logout_get(request: Request):
     """Logout via GET (for link convenience)."""
-    return await logout()
+    return await logout(request)
 
 
 # API endpoints for HTMX/JSON clients

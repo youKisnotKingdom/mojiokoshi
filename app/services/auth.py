@@ -1,11 +1,10 @@
-from datetime import datetime
-
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
+from app.time_utils import utc_now
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -77,7 +76,7 @@ def authenticate_user(db: Session, user_id: str, password: str) -> User | None:
         return None
 
     # Update last login time
-    user.last_login_at = datetime.now()
+    user.last_login_at = utc_now()
     db.commit()
 
     return user

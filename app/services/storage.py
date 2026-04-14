@@ -1,11 +1,11 @@
 import shutil
 import uuid
-from datetime import datetime
 from pathlib import Path
 
 import aiofiles
 
 from app.config import get_settings
+from app.time_utils import tokyo_now
 
 settings = get_settings()
 
@@ -44,7 +44,7 @@ def get_chunks_dir() -> Path:
 
 def get_date_based_dir(base_dir: Path) -> Path:
     """Get a date-based subdirectory (YYYY/MM/DD format)."""
-    today = datetime.now()
+    today = tokyo_now()
     date_dir = base_dir / str(today.year) / f"{today.month:02d}" / f"{today.day:02d}"
     date_dir.mkdir(parents=True, exist_ok=True)
     return date_dir

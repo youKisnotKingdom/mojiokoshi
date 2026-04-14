@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
@@ -15,6 +15,7 @@ from app.models.user import User
 from app.schemas.transcription import TranscriptionJobResponse
 from app.services import storage
 from app.templating import templates
+from app.time_utils import utc_now
 
 settings = get_settings()
 router = APIRouter(prefix="/transcription", tags=["transcription"])
@@ -123,7 +124,7 @@ async def upload_file(
         await file.close()
 
     # Calculate expiration date
-    expires_at = datetime.now() + timedelta(days=settings.audio_retention_days)
+    expires_at = utc_now() + timedelta(days=settings.audio_retention_days)
 
     # Create audio file record
     audio_file = AudioFile(

@@ -5,7 +5,7 @@ import asyncio
 import base64
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -20,6 +20,7 @@ from app.models import TranscriptionEngine, TranscriptionJob
 from app.models.user import User
 from app.schemas.recording import WSChunkReceived, WSError, WSTranscriptionResult
 from app.services import storage
+from app.time_utils import utc_now
 
 settings = get_settings()
 router = APIRouter(tags=["recording"])
@@ -166,6 +167,7 @@ async def recording_websocket(
                     chunk_index = message.get("chunk_index", 0)
                     is_final = message.get("is_final", False)
                     audio_data = message.get("data")
+                    elapsed_ms = message.get("elapsed_ms")
 
                     if not audio_data:
                         await manager.send_error(session_id, "No audio data in chunk")
@@ -186,10 +188,13 @@ async def recording_websocket(
                     )
                     chunk_files.append(chunk_path)
 
-                    # Estimate duration (rough estimate for webm/opus)
-                    # More accurate duration can be calculated during transcription
-                    chunk_duration = len(audio_bytes) / 16000  # Rough estimate
-                    total_duration += chunk_duration
+                    if isinstance(elapsed_ms, (int, float)) and elapsed_ms >= 0:
+                        reported_total_duration = elapsed_ms / 1000.0
+                    else:
+                        reported_total_duration = total_duration
+
+                    chunk_duration = max(0.0, reported_total_duration - total_duration)
+                    total_duration = max(total_duration, reported_total_duration)
 
                     # Save chunk to database
                     chunk_record = RecordingChunk(
@@ -208,10 +213,16 @@ async def recording_websocket(
                     chunk_record_id = chunk_record.id
                     db.commit()
 
+                    # チャンクをリアルタイムで文字起こし
+                    task = asyncio.create_task(
+                        transcribe_and_send(session_id, chunk_path, chunk_index, chunk_record_id)
+                    )
+                    track_transcription_task(session_id, task)
+
                     # Send confirmation
                     await manager.send_chunk_received(session_id, chunk_index, total_duration)
 
-                    # If final chunk, finalize recording
+                    # If final chunk, finalize recording after all tracked tasks complete
                     if is_final:
                         await finalize_recording(
                             db, recording_session, user, chunk_files, total_duration
@@ -221,15 +232,9 @@ async def recording_websocket(
                             "session_id": str(recording_session.id),
                         })
 
-                    # チャンクをリアルタイムで文字起こし
-                    task = asyncio.create_task(
-                        transcribe_and_send(session_id, chunk_path, chunk_index, chunk_record_id)
-                    )
-                    track_transcription_task(session_id, task)
-
                 elif msg_type == "pause":
                     recording_session.status = RecordingStatus.PAUSED
-                    recording_session.paused_at = datetime.now()
+                    recording_session.paused_at = utc_now()
                     db.commit()
 
                 elif msg_type == "resume":
@@ -241,7 +246,7 @@ async def recording_websocket(
             # Handle unexpected disconnect
             if recording_session.status == RecordingStatus.RECORDING:
                 recording_session.status = RecordingStatus.PAUSED
-                recording_session.paused_at = datetime.now()
+                recording_session.paused_at = utc_now()
                 db.commit()
 
     except Exception as e:
@@ -296,7 +301,7 @@ async def finalize_recording(
     )
 
     # Calculate expiration
-    expires_at = datetime.now() + timedelta(days=settings.audio_retention_days)
+    expires_at = utc_now() + timedelta(days=settings.audio_retention_days)
 
     # Create audio file record
     audio_file = AudioFile(
@@ -316,7 +321,7 @@ async def finalize_recording(
     # Update session
     session.status = RecordingStatus.COMPLETED
     session.audio_file_id = audio_file.id
-    session.completed_at = datetime.now()
+    session.completed_at = utc_now()
     session.total_duration_seconds = total_duration
 
     # Create transcription job

@@ -10,7 +10,7 @@
 環境変数:
   WHISPER_MODEL_SIZE  モデルサイズ (default: small)
   WHISPER_DEVICE      cpu / cuda (default: cpu)
-  LLM_API_BASE_URL    OpenAI互換API URL (default: http://localhost:11434/v1)
+  LLM_API_BASE_URL    OpenAI互換API URL (required)
   LLM_MODEL_NAME      使用モデル名 (default: default)
 """
 import asyncio
@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "medium")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")
 WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "ja")
-LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://localhost:11434/v1")
+LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL")
+if not LLM_API_BASE_URL:
+    raise RuntimeError("LLM_API_BASE_URL must be set for demo.checker")
 LLM_MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "default")
 
 SAMPLE_RATE = 16000

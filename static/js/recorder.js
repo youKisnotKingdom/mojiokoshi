@@ -15,6 +15,7 @@ class AudioRecorder {
         this.startTime = null;
         this.pausedTime = 0;
         this.timerInterval = null;
+        this.chunkUploadIntervalId = null;
         this.ws = null;
         this.chunkInterval = 10000; // 10 seconds
 
@@ -30,17 +31,9 @@ class AudioRecorder {
         this.chunkInfo = document.getElementById('chunk-info');
         this.chunkCount = document.getElementById('chunk-count');
         this.transcriptionOutput = document.getElementById('transcription-output');
-        this.recoveryNotice = document.getElementById('recovery-notice');
 
-        // Check for existing session
-        this.checkExistingSession();
-    }
-
-    checkExistingSession() {
-        const savedSession = localStorage.getItem('recording_session');
-        if (savedSession) {
-            this.recoveryNotice.classList.remove('hidden');
-        }
+        // Cleanup stale recovery state from older builds.
+        localStorage.removeItem('recording_session');
     }
 
     async start() {
@@ -76,13 +69,7 @@ class AudioRecorder {
             this.startTime = Date.now();
             this.pausedTime = 0;
             this.chunkIndex = 0;
-
-            // Generate session ID
             this.sessionId = crypto.randomUUID();
-            localStorage.setItem('recording_session', JSON.stringify({
-                sessionId: this.sessionId,
-                startTime: this.startTime
-            }));
 
             // Connect WebSocket
             this.connectWebSocket();
@@ -129,6 +116,11 @@ class AudioRecorder {
 
         return new Promise((resolve) => {
             this.mediaRecorder.onstop = async () => {
+                if (this.chunkUploadIntervalId) {
+                    clearInterval(this.chunkUploadIntervalId);
+                    this.chunkUploadIntervalId = null;
+                }
+
                 // Upload final chunk and wait for server confirmation
                 await this.uploadChunk(true);
 
@@ -161,9 +153,6 @@ class AudioRecorder {
                 if (this.ws) {
                     this.ws.close();
                 }
-
-                // Clear session
-                localStorage.removeItem('recording_session');
 
                 this.isRecording = false;
                 this.isPaused = false;
@@ -252,7 +241,11 @@ class AudioRecorder {
     }
 
     scheduleChunkUpload() {
-        setInterval(() => {
+        if (this.chunkUploadIntervalId) {
+            clearInterval(this.chunkUploadIntervalId);
+        }
+
+        this.chunkUploadIntervalId = setInterval(() => {
             if (this.isRecording && !this.isPaused && this.audioChunks.length > 0) {
                 this.uploadChunk(false);
             }
@@ -261,6 +254,8 @@ class AudioRecorder {
 
     async uploadChunk(isFinal) {
         if (this.audioChunks.length === 0 && !isFinal) return;
+
+        const elapsedMs = this.startTime ? Math.max(0, Date.now() - this.startTime) : 0;
 
         // 初期化セグメント（ヘッダー）を先頭に付加して有効な webm ファイルにする
         const parts = this.initChunk
@@ -278,6 +273,7 @@ class AudioRecorder {
                         type: 'chunk',
                         chunk_index: this.chunkIndex,
                         is_final: isFinal,
+                        elapsed_ms: elapsedMs,
                         data: reader.result.split(',')[1] // Base64 data
                     }));
                     this.chunkIndex++;
@@ -402,11 +398,9 @@ function stopRecording() {
 }
 
 function recoverSession() {
-    // TODO: Implement session recovery
-    document.getElementById('recovery-notice').classList.add('hidden');
+    localStorage.removeItem('recording_session');
 }
 
 function discardSession() {
     localStorage.removeItem('recording_session');
-    document.getElementById('recovery-notice').classList.add('hidden');
 }

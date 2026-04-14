@@ -3,7 +3,6 @@ Transcription service using faster-whisper for audio transcription.
 """
 import asyncio
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Callable, Generator, Optional
 
@@ -11,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import TranscriptionEngine, TranscriptionJob, TranscriptionStatus
+from app.time_utils import utc_now
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ async def process_transcription_job(
     try:
         # Update status to processing
         job.status = TranscriptionStatus.PROCESSING
-        job.started_at = datetime.now()
+        job.started_at = utc_now()
         job.progress_percent = 0.0
         db.commit()
 
@@ -175,7 +175,7 @@ async def process_transcription_job(
         job.result_segments = segments
         job.status = TranscriptionStatus.COMPLETED
         job.progress_percent = 100.0
-        job.completed_at = datetime.now()
+        job.completed_at = utc_now()
         db.commit()
 
         logger.info(f"Completed transcription job {job.id}")
@@ -185,7 +185,7 @@ async def process_transcription_job(
         logger.error(f"Transcription job {job.id} failed: {e}")
         job.status = TranscriptionStatus.FAILED
         job.error_message = str(e)
-        job.completed_at = datetime.now()
+        job.completed_at = utc_now()
         db.commit()
         return False
 

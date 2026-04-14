@@ -83,7 +83,7 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ job.created_at.strftime('%Y/%m/%d %H:%M') }}
+                            {{ job.created_at|jst_datetime('%Y/%m/%d %H:%M') }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <div class="flex items-center space-x-3">

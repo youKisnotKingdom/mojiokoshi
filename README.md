@@ -61,7 +61,7 @@ curl -o static/js/htmx.min.js https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js
 3. Start development services:
 
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 4. Set up environment:
@@ -77,7 +77,7 @@ cp .env.example .env
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-6. Open http://localhost:8000
+6. Open `http://localhost:8000` for local development
 
 ### Development CSS Watch
 
@@ -109,8 +109,11 @@ cp .env.example .env
 # Required: Set a secure secret key
 SECRET_KEY=your-secure-secret-key-here
 
+# Hosts allowed in the Host header
+ALLOWED_HOSTS=localhost,127.0.0.1,<server-ip>
+
 # LLM server on your local network
-LLM_API_BASE_URL=http://192.168.1.100:8080/v1
+LLM_API_BASE_URL=http://<llm-server-ip>:8080/v1
 LLM_MODEL_NAME=your-model-name
 
 # Whisper settings
@@ -121,30 +124,30 @@ WHISPER_DEVICE=cuda  # or 'cpu' for CPU-only
 3. Build and start:
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 4. Create admin user:
 
 ```bash
-docker-compose exec web python scripts/init_db.py --create-admin --admin-id 000001
+docker compose exec web python scripts/init_db.py --create-admin --admin-id 000001
 ```
 
-5. Access at http://localhost:8000
+5. Access at `http://<server-ip>:8000`
 
 ### GPU Support
 
 For NVIDIA GPU support, ensure you have:
 - NVIDIA Container Toolkit installed
-- Uncomment GPU sections in `docker-compose.yml`
+- NVIDIA driver installed on the host
 
 ### Services
 
 The deployment includes:
-- **web**: Main web application (FastAPI) — http://localhost:8000
+- **web**: Main web application (FastAPI) — `http://<server-ip>:8000`
 - **worker**: Background worker for transcription and summarization
 - **db**: PostgreSQL database
-- **checker**: Real-time transcription checker demo — http://localhost:8001
+- **checker**: Real-time transcription checker demo — `http://<server-ip>:8001`
 
 With HTTPS overlay (`docker-compose.https.yml`):
 - Main app: https://\<server-ip\> (port 443)
@@ -155,6 +158,7 @@ With HTTPS overlay (`docker-compose.https.yml`):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SECRET_KEY` | - | Secret key for session signing (required) |
+| `ALLOWED_HOSTS` | localhost,127.0.0.1,::1 | Comma-separated allowed `Host` headers |
 | `DATABASE_URL` | - | PostgreSQL connection URL |
 | `LLM_API_BASE_URL` | - | Local LLM server URL |
 | `LLM_MODEL_NAME` | default | Model name for summarization |

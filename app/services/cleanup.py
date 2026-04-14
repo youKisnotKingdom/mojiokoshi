@@ -2,7 +2,7 @@
 Cleanup service for automatic deletion of expired audio files.
 """
 import logging
-from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 from sqlalchemy import select, update
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import AudioFile
+from app.time_utils import utc_now
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def get_expired_audio_files(db: Session, limit: int = 100) -> list[AudioFile]:
     """Get audio files that have passed their expiration date."""
-    now = datetime.now()
+    now = utc_now()
     stmt = (
         select(AudioFile)
         .where(AudioFile.expires_at <= now)
@@ -41,7 +42,7 @@ def delete_audio_file(db: Session, audio_file: AudioFile) -> bool:
             logger.info(f"Deleted file: {file_path}")
 
         # Mark as deleted in database (soft delete)
-        audio_file.deleted_at = datetime.now()
+        audio_file.deleted_at = utc_now()
         db.commit()
 
         logger.info(f"Marked audio file {audio_file.id} as deleted")
@@ -83,9 +84,7 @@ def cleanup_orphaned_chunks(db: Session) -> int:
     from app.models import RecordingChunk, RecordingSession, RecordingStatus
 
     # Find chunks from sessions that are not completed and older than 24 hours
-    cutoff = datetime.now()
-    from datetime import timedelta
-    cutoff = cutoff - timedelta(hours=24)
+    cutoff = utc_now() - timedelta(hours=24)
 
     # Get orphaned sessions
     stmt = (

@@ -4,7 +4,7 @@ E2E 統合テスト（実際のWhisperモデル + 実際のLLM使用）
 実行方法:
     pytest tests/test_e2e.py -v -s \
         --whisper-model=tiny \
-        --llm-url=http://192.168.86.14:7801/v1 \
+        --llm-url=http://<llm-server-ip>:7801/v1 \
         --llm-model=qwen3.5-35b-awq-a5000-14
 
 マーカー: @pytest.mark.e2e
@@ -26,8 +26,14 @@ TEST_AUDIO_MP3 = FIXTURES_DIR / "test_speech_ja.mp3"
 # E2E テスト用の設定（環境変数またはデフォルト値）
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL_SIZE", "tiny")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")
-LLM_URL = os.environ.get("LLM_API_BASE_URL", "http://192.168.86.14:7801/v1")
+LLM_URL = os.environ.get("LLM_API_BASE_URL")
 LLM_MODEL = os.environ.get("LLM_MODEL_NAME", "qwen3.5-35b-awq-a5000-14")
+
+
+def require_llm_config() -> tuple[str, str]:
+    if not LLM_URL:
+        pytest.skip("LLM_API_BASE_URL is not set")
+    return LLM_URL, LLM_MODEL
 
 
 
@@ -96,8 +102,7 @@ class TestLLME2E:
     def test_llm_reachable(self, request):
         """LLM API に接続できて応答が返る"""
         import httpx
-        llm_url = LLM_URL
-        llm_model = LLM_MODEL
+        llm_url, _ = require_llm_config()
 
         resp = httpx.get(f"{llm_url}/models", timeout=5.0)
         assert resp.status_code == 200
@@ -109,8 +114,7 @@ class TestLLME2E:
         import sys
         sys.path.insert(0, ".")
 
-        llm_url = LLM_URL
-        llm_model = LLM_MODEL
+        llm_url, llm_model = require_llm_config()
 
         os.environ["LLM_API_BASE_URL"] = llm_url
         os.environ["LLM_MODEL_NAME"] = llm_model
@@ -149,8 +153,7 @@ class TestCheckerE2E:
         sys.path.insert(0, ".")
 
         model_size = WHISPER_MODEL
-        llm_url = LLM_URL
-        llm_model = LLM_MODEL
+        llm_url, llm_model = require_llm_config()
 
         os.environ["WHISPER_MODEL_SIZE"] = model_size
         os.environ["WHISPER_DEVICE"] = WHISPER_DEVICE
@@ -194,8 +197,7 @@ class TestCheckerE2E:
         sys.path.insert(0, ".")
 
         model_size = WHISPER_MODEL
-        llm_url = LLM_URL
-        llm_model = LLM_MODEL
+        llm_url, llm_model = require_llm_config()
 
         os.environ["WHISPER_MODEL_SIZE"] = model_size
         os.environ["WHISPER_DEVICE"] = WHISPER_DEVICE

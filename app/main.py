@@ -11,6 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import get_settings
 from app.database import SessionLocal
@@ -47,10 +49,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# nginxリバースプロキシ経由のスキーム・ホスト情報を信頼する
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+# nginx リバースプロキシ経由のスキーム情報を信頼する
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+allowed_hosts = [host.strip() for host in settings.allowed_hosts.split(",") if host.strip()]
+if allowed_hosts:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

@@ -56,18 +56,18 @@
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <dt class="text-sm text-gray-500">作成日時</dt>
-                <dd class="text-sm text-gray-900">{{ summary.created_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
+                <dd class="text-sm text-gray-900">{{ summary.created_at|jst_datetime('%Y/%m/%d %H:%M:%S') }}</dd>
             </div>
             {% if summary.started_at %}
             <div>
                 <dt class="text-sm text-gray-500">開始日時</dt>
-                <dd class="text-sm text-gray-900">{{ summary.started_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
+                <dd class="text-sm text-gray-900">{{ summary.started_at|jst_datetime('%Y/%m/%d %H:%M:%S') }}</dd>
             </div>
             {% endif %}
             {% if summary.completed_at %}
             <div>
                 <dt class="text-sm text-gray-500">完了日時</dt>
-                <dd class="text-sm text-gray-900">{{ summary.completed_at.strftime('%Y/%m/%d %H:%M:%S') }}</dd>
+                <dd class="text-sm text-gray-900">{{ summary.completed_at|jst_datetime('%Y/%m/%d %H:%M:%S') }}</dd>
             </div>
             {% endif %}
             <div>

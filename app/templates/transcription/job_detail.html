@@ -25,7 +25,7 @@
                     {{ job.audio_file.original_filename }}
                 </h2>
                 <p class="text-sm text-gray-500">
-                    アップロード日時: {{ job.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    アップロード日時: {{ job.created_at|jst_datetime('%Y-%m-%d %H:%M') }}
                 </p>
             </div>
             <div class="text-right">
@@ -78,7 +78,7 @@
             <div class="border border-gray-200 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm text-gray-500">
-                        {{ summary.created_at.strftime('%Y-%m-%d %H:%M') }}
+                        {{ summary.created_at|jst_datetime('%Y-%m-%d %H:%M') }}
                     </span>
                     {% if summary.status.value == 'completed' %}
                     <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">完了</span>
