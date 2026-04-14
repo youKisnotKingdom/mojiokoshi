@@ -26,6 +26,7 @@ router = APIRouter(tags=["recording"])
 
 # Store active WebSocket connections
 active_connections: dict[str, WebSocket] = {}
+active_transcription_tasks: dict[str, set[asyncio.Task]] = {}
 
 
 class ConnectionManager:
@@ -75,6 +76,27 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+
+def track_transcription_task(session_id: str, task: asyncio.Task) -> None:
+    tasks = active_transcription_tasks.setdefault(session_id, set())
+    tasks.add(task)
+
+    def _cleanup(done_task: asyncio.Task) -> None:
+        session_tasks = active_transcription_tasks.get(session_id)
+        if not session_tasks:
+            return
+        session_tasks.discard(done_task)
+        if not session_tasks:
+            active_transcription_tasks.pop(session_id, None)
+
+    task.add_done_callback(_cleanup)
+
+
+async def wait_for_transcription_tasks(session_id: str) -> None:
+    tasks = list(active_transcription_tasks.get(session_id, set()))
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def get_ws_user(websocket: WebSocket, db: Session) -> User | None:
@@ -200,9 +222,10 @@ async def recording_websocket(
                         })
 
                     # チャンクをリアルタイムで文字起こし
-                    asyncio.create_task(
+                    task = asyncio.create_task(
                         transcribe_and_send(session_id, chunk_path, chunk_index, chunk_record_id)
                     )
+                    track_transcription_task(session_id, task)
 
                 elif msg_type == "pause":
                     recording_session.status = RecordingStatus.PAUSED
@@ -224,6 +247,7 @@ async def recording_websocket(
     except Exception as e:
         await manager.send_error(session_id, f"Server error: {str(e)}")
     finally:
+        await wait_for_transcription_tasks(session_id)
         manager.disconnect(session_id)
         db.close()
 
@@ -264,6 +288,8 @@ async def finalize_recording(
     total_duration: float,
 ):
     """Finalize recording: merge chunks and create transcription job."""
+    await wait_for_transcription_tasks(str(session.id))
+
     # Merge chunks into single audio file
     merged_filename, merged_path, merged_size = await storage.merge_recording_chunks(
         chunk_files, str(session.id)

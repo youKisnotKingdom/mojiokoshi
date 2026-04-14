@@ -99,9 +99,15 @@ async def upload_file(
             status_code=400,
         )
 
-    # Read and save file
-    content = await file.read()
-    if len(content) > settings.max_upload_size:
+    # Stream the upload to disk to keep memory usage bounded.
+    try:
+        stored_filename, file_path, file_size = await storage.save_upload_stream(
+            file,
+            file.filename,
+            max_size=settings.max_upload_size,
+            mime_type=file.content_type,
+        )
+    except ValueError:
         return templates.TemplateResponse(
             "transcription/upload.html",
             {
@@ -113,10 +119,8 @@ async def upload_file(
             },
             status_code=400,
         )
-
-    stored_filename, file_path = await storage.save_upload_file(
-        content, file.filename, file.content_type
-    )
+    finally:
+        await file.close()
 
     # Calculate expiration date
     expires_at = datetime.now() + timedelta(days=settings.audio_retention_days)
@@ -128,7 +132,7 @@ async def upload_file(
         original_filename=file.filename,
         stored_filename=stored_filename,
         file_path=file_path,
-        file_size=len(content),
+        file_size=file_size,
         mime_type=file.content_type,
         expires_at=expires_at,
     )

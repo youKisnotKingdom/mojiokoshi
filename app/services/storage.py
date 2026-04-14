@@ -1,4 +1,3 @@
-import os
 import shutil
 import uuid
 from datetime import datetime
@@ -25,6 +24,8 @@ ALLOWED_AUDIO_TYPES = {
     "audio/x-m4a": ".m4a",
     "audio/aac": ".aac",
 }
+
+UPLOAD_STREAM_CHUNK_SIZE = 4 * 1024 * 1024  # 4MB
 
 
 def get_upload_dir() -> Path:
@@ -95,6 +96,49 @@ async def save_upload_file(
         await f.write(file_content)
 
     return stored_filename, str(file_path)
+
+
+async def save_upload_stream(
+    upload_file,
+    original_filename: str,
+    max_size: int,
+    mime_type: str | None = None,
+    chunk_size: int = UPLOAD_STREAM_CHUNK_SIZE,
+) -> tuple[str, str, int]:
+    """
+    Stream an uploaded file to disk while enforcing a maximum size.
+
+    Returns:
+        Tuple of (stored_filename, file_path, file_size)
+    """
+    upload_dir = get_date_based_dir(get_upload_dir())
+
+    if mime_type and mime_type in ALLOWED_AUDIO_TYPES:
+        extension = ALLOWED_AUDIO_TYPES[mime_type]
+    else:
+        extension = Path(original_filename).suffix or ".bin"
+
+    stored_filename = generate_stored_filename(original_filename, extension)
+    file_path = upload_dir / stored_filename
+    total_size = 0
+
+    try:
+        async with aiofiles.open(file_path, "wb") as f:
+            while True:
+                chunk = await upload_file.read(chunk_size)
+                if not chunk:
+                    break
+
+                total_size += len(chunk)
+                if total_size > max_size:
+                    raise ValueError("File too large")
+
+                await f.write(chunk)
+    except Exception:
+        file_path.unlink(missing_ok=True)
+        raise
+
+    return stored_filename, str(file_path), total_size
 
 
 async def save_chunk_file(
