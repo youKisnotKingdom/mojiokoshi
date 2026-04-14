@@ -22,27 +22,19 @@ services:
       - AUDIO_RETENTION_DAYS=${AUDIO_RETENTION_DAYS:-30}
       - ADMIN_USER_ID=${ADMIN_USER_ID:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
-      - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:
       - uploads:/app/uploads
       - models:/app/models   # Whisper モデルキャッシュ
-      - /usr/local/lib/ollama/cuda_v12:/usr/local/lib/ollama/cuda_v12:ro
     depends_on:
       db:
         condition: service_healthy
+    gpus: all
     restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "100m"
         max-file: "5"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   # Background worker for transcription and summarization
   worker:
@@ -61,27 +53,19 @@ services:
       - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-medium}
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
       - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ja}
-      - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:
       - uploads:/app/uploads
       - models:/app/models   # web と同じモデルボリュームを共有
-      - /usr/local/lib/ollama/cuda_v12:/usr/local/lib/ollama/cuda_v12:ro
     depends_on:
       db:
         condition: service_healthy
+    gpus: all
     restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "100m"
         max-file: "5"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   # Real-time transcription checker demo
   checker:
@@ -101,23 +85,15 @@ services:
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
       - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ja}
       - HF_HOME=/app/models
-      - LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
     volumes:
       - models:/app/models
-      - /usr/local/lib/ollama/cuda_v12:/usr/local/lib/ollama/cuda_v12:ro
+    gpus: all
     restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "100m"
         max-file: "5"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   # PostgreSQL database
   db:

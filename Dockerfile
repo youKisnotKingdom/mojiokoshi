@@ -15,16 +15,26 @@ RUN npx tailwindcss -i ./static/src/input.css -o ./static/css/styles.css --minif
 
 
 # Stage 2: Main application
-FROM python:3.11-slim
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
-# Install system dependencies (ffmpeg for audio processing)
+# Install system dependencies, Python, and ffmpeg for audio processing.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
     ffmpeg \
     libsndfile1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+RUN ln -sf /usr/bin/python3 /usr/local/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/local/bin/pip
+
 WORKDIR /app
+
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install Python dependencies (includes faster-whisper)
 COPY requirements.txt .
@@ -48,8 +58,9 @@ RUN chmod +x scripts/entrypoint.sh
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-# Whisper/HuggingFace モデルキャッシュをボリュームに向ける
 ENV HF_HOME=/app/models
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 EXPOSE 8000
 
