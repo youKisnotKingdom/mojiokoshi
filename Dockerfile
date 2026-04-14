@@ -54,7 +54,7 @@ COPY --from=tailwind-builder /build/static/css/styles.css ./static/css/styles.cs
 # Create upload directory
 RUN mkdir -p /app/uploads
 
-RUN chmod +x scripts/entrypoint.sh
+RUN chmod +x scripts/entrypoint.sh scripts/worker_entrypoint.sh
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # Main web application
   web:
@@ -41,6 +39,7 @@ services:
     build: .
     image: mojiokoshi:latest
     container_name: mojiokoshi-worker
+    entrypoint: ["scripts/worker_entrypoint.sh"]
     command: python -m app.services.worker
     environment:
       - TZ=Asia/Tokyo
