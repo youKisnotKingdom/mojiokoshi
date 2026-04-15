@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -107,6 +107,8 @@ async def logout_get(request: Request):
 # API endpoints for HTMX/JSON clients
 @router.post("/api/login", response_model=LoginResponse)
 async def api_login(
+    request: Request,
+    response: Response,
     db: Annotated[Session, Depends(get_db)],
     login_data: LoginRequest,
 ):
@@ -118,6 +120,17 @@ async def api_login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="ユーザーIDまたはパスワードが正しくありません",
         )
+
+    session_token = create_session_token(user.id)
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/",
+    )
 
     return LoginResponse(
         message="ログインに成功しました",

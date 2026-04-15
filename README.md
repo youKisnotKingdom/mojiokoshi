@@ -170,6 +170,33 @@ With HTTPS overlay (`docker-compose.https.yml`):
 | `HTTPS_PORT` | 443 | HTTPS port for main app (with nginx overlay) |
 | `CHECKER_HTTPS_PORT` | 8444 | HTTPS port for checker demo (with nginx overlay) |
 
+### ASR 検証用モデル
+
+アプリ本体に直接組み込まず、比較検証だけしたいモデルは `config/asr_validation_models.json` と
+`scripts/download_validation_models.py` で管理します。
+
+登録済みの候補:
+- `nvidia/parakeet-tdt_ctc-0.6b-ja`
+- `CohereLabs/cohere-transcribe-03-2026`
+- `reazon-research/japanese-zipformer-base-k2-rs35kh`
+- `Qwen/Qwen3-ASR-0.6B` (`qwen_asr` の検証対象)
+
+コマンド例:
+
+```bash
+# 登録済みモデルを確認
+python scripts/download_validation_models.py --list
+
+# すべて取得
+python scripts/download_validation_models.py
+
+# Qwen3-ASR だけ取得
+python scripts/download_validation_models.py --only qwen_asr
+```
+
+`CohereLabs/cohere-transcribe-03-2026` のような gated model を取得する場合は、
+Hugging Face 上でアクセス承認後に `HF_TOKEN` を設定してください。
+
 ## Project Structure
 
 ```
@@ -187,6 +214,7 @@ mojiokoshi/
 │   ├── css/              # Built CSS
 │   ├── js/               # JavaScript (HTMX, etc.)
 │   └── src/              # Tailwind source
+├── config/               # Validation model catalogs
 ├── uploads/              # Uploaded files
 ├── tests/                # Test files
 ├── tasks/                # Project task management

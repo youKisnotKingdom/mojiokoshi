@@ -262,29 +262,40 @@ class AudioRecorder {
             ? [this.initChunk, ...this.audioChunks]
             : [...this.audioChunks];
         const blob = new Blob(parts, { type: 'audio/webm' });
-        this.audioChunks = [];
 
         // Send via WebSocket if connected
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    this.ws.send(JSON.stringify({
-                        type: 'chunk',
-                        chunk_index: this.chunkIndex,
-                        is_final: isFinal,
-                        elapsed_ms: elapsedMs,
-                        data: reader.result.split(',')[1] // Base64 data
-                    }));
-                    this.chunkIndex++;
-                    resolve();
-                };
-                reader.readAsDataURL(blob);
-            });
-        } else {
-            // Fallback: save to IndexedDB for later upload
-            await this.saveToIndexedDB(blob);
+            try {
+                await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        try {
+                            this.ws.send(JSON.stringify({
+                                type: 'chunk',
+                                chunk_index: this.chunkIndex,
+                                is_final: isFinal,
+                                elapsed_ms: elapsedMs,
+                                data: reader.result.split(',')[1] // Base64 data
+                            }));
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsDataURL(blob);
+                });
+                this.audioChunks = [];
+                this.chunkIndex++;
+                return;
+            } catch (error) {
+                console.warn('WebSocket send failed, falling back to IndexedDB:', error);
+            }
         }
+
+        // Fallback: save to IndexedDB for later upload
+        await this.saveToIndexedDB(blob);
+        this.audioChunks = [];
     }
 
     async saveToIndexedDB(blob) {

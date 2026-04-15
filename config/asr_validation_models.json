@@ -1,0 +1,55 @@
+{
+  "models": [
+    {
+      "alias": "parakeet_ja",
+      "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+      "family": "parakeet",
+      "parameters": "0.6B",
+      "runtime": "nemo",
+      "access": "public",
+      "summary": "NVIDIA の日本語 Parakeet モデル。",
+      "notes": [
+        "推論には NeMo ASR ランタイムが必要です。",
+        "アプリ本体には未接続で、検証用モデルとして管理します。"
+      ]
+    },
+    {
+      "alias": "cohere_transcribe",
+      "repo_id": "CohereLabs/cohere-transcribe-03-2026",
+      "family": "cohere-transcribe",
+      "parameters": "vendor-managed",
+      "runtime": "transformers",
+      "access": "gated",
+      "summary": "Cohere の音声文字起こしモデル。",
+      "notes": [
+        "取得には Hugging Face 上でのアクセス承認が必要な可能性があります。",
+        "必要に応じて HF_TOKEN を設定してください。"
+      ]
+    },
+    {
+      "alias": "reazon_zipformer",
+      "repo_id": "reazon-research/japanese-zipformer-base-k2-rs35kh",
+      "family": "zipformer",
+      "parameters": "base",
+      "runtime": "transformers/k2",
+      "access": "public",
+      "summary": "Reazon Research の日本語 Zipformer ベースモデル。",
+      "notes": [
+        "k2 系の実行環境を別途用意する前提の検証候補です。"
+      ]
+    },
+    {
+      "alias": "qwen_asr",
+      "repo_id": "Qwen/Qwen3-ASR-0.6B",
+      "family": "qwen3-asr",
+      "parameters": "0.6B",
+      "runtime": "qwen-asr / vllm",
+      "access": "public",
+      "summary": "Qwen3-ASR 系の軽量モデル。検証用の Qwen ASR 候補として採用。",
+      "notes": [
+        "公式の qwen-asr パッケージまたは vLLM バックエンドでの検証を想定しています。",
+        "より高精度側を試す場合は Qwen/Qwen3-ASR-1.7B の追加を検討してください。"
+      ]
+    }
+  ]
+}
