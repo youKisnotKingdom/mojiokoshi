@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,53 @@ from app.time_utils import utc_now
 
 settings = get_settings()
 router = APIRouter(prefix="/transcription", tags=["transcription"])
+
+
+def _max_upload_size_mb() -> int:
+    mib = 1024 * 1024
+    return max(1, (settings.max_upload_size + mib - 1) // mib)
+
+
+def _upload_page_context(
+    request: Request,
+    current_user: User,
+    *,
+    error: str | None = None,
+) -> dict[str, object]:
+    return {
+        "request": request,
+        "title": "音声アップロード",
+        "current_user": current_user,
+        "engines": TranscriptionEngine,
+        "error": error,
+        "max_upload_size_mb": _max_upload_size_mb(),
+    }
+
+
+def _is_ajax_upload(request: Request) -> bool:
+    return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+
+def _upload_error_response(
+    request: Request,
+    current_user: User,
+    error: str,
+    *,
+    status_code: int,
+):
+    if _is_ajax_upload(request):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": error,
+            },
+            status_code=status_code,
+        )
+    return templates.TemplateResponse(
+        "transcription/upload.html",
+        _upload_page_context(request, current_user, error=error),
+        status_code=status_code,
+    )
 
 
 @router.get("", response_class=HTMLResponse)
@@ -45,12 +92,7 @@ async def upload_page(
     """File upload page."""
     return templates.TemplateResponse(
         "transcription/upload.html",
-        {
-            "request": request,
-            "title": "音声アップロード",
-            "current_user": current_user,
-            "engines": TranscriptionEngine,
-        },
+        _upload_page_context(request, current_user),
     )
 
 
@@ -74,29 +116,19 @@ async def upload_file(
         )
     # Validate file
     if not file.filename:
-        return templates.TemplateResponse(
-            "transcription/upload.html",
-            {
-                "request": request,
-                "title": "音声アップロード",
-                "current_user": current_user,
-                "engines": TranscriptionEngine,
-                "error": "ファイルが選択されていません",
-            },
+        return _upload_error_response(
+            request,
+            current_user,
+            "ファイルが選択されていません",
             status_code=400,
         )
 
     # Check MIME type
     if not storage.validate_audio_mime_type(file.content_type):
-        return templates.TemplateResponse(
-            "transcription/upload.html",
-            {
-                "request": request,
-                "title": "音声アップロード",
-                "current_user": current_user,
-                "engines": TranscriptionEngine,
-                "error": f"無効なファイル形式です: {file.content_type}。音声ファイルをアップロードしてください。",
-            },
+        return _upload_error_response(
+            request,
+            current_user,
+            f"無効なファイル形式です: {file.content_type}。音声ファイルをアップロードしてください。",
             status_code=400,
         )
 
@@ -109,15 +141,10 @@ async def upload_file(
             mime_type=file.content_type,
         )
     except ValueError:
-        return templates.TemplateResponse(
-            "transcription/upload.html",
-            {
-                "request": request,
-                "title": "音声アップロード",
-                "current_user": current_user,
-                "engines": TranscriptionEngine,
-                "error": f"ファイルが大きすぎます。最大サイズは{settings.max_upload_size // 1024 // 1024}MBです。",
-            },
+        return _upload_error_response(
+            request,
+            current_user,
+            f"ファイルが大きすぎます。最大サイズは{_max_upload_size_mb()}MBです。",
             status_code=400,
         )
     finally:
@@ -157,9 +184,20 @@ async def upload_file(
     db.commit()
 
     # Redirect to job status page
+    redirect_url = f"/transcription/job/{job.id}"
+    if _is_ajax_upload(request):
+        return JSONResponse(
+            {
+                "ok": True,
+                "redirect_url": redirect_url,
+                "job_id": str(job.id),
+            },
+            status_code=201,
+        )
+
     from fastapi.responses import RedirectResponse
     return RedirectResponse(
-        url=f"/transcription/job/{job.id}",
+        url=redirect_url,
         status_code=303,
     )
 

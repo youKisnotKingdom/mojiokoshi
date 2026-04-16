@@ -73,7 +73,7 @@
                 </div>
                 <div class="flex justify-end space-x-3 pt-4">
                     <button type="button" onclick="hideModal()" class="btn btn-secondary">キャンセル</button>
-                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="submit" id="template-submit-btn" class="btn btn-primary">保存</button>
                 </div>
             </form>
         </div>
@@ -83,14 +83,32 @@
 
 {% block scripts %}
 <script>
+const templateModal = document.getElementById('template-modal');
+const templateForm = document.getElementById('template-form');
+const templateSubmitBtn = document.getElementById('template-submit-btn');
+let isTemplateSaving = false;
+let isTemplateDirty = false;
+
+function setTemplateSavingState(saving) {
+    isTemplateSaving = saving;
+    for (const element of templateForm.elements) {
+        element.disabled = saving;
+    }
+    templateSubmitBtn.textContent = saving ? '保存中...' : '保存';
+}
+
 function showCreateModal() {
     document.getElementById('modal-title').textContent = '新規プロンプトテンプレート';
-    document.getElementById('template-form').reset();
-    document.getElementById('template-modal').classList.remove('hidden');
+    templateForm.reset();
+    isTemplateDirty = false;
+    setTemplateSavingState(false);
+    templateModal.classList.remove('hidden');
 }
 
 function hideModal() {
-    document.getElementById('template-modal').classList.add('hidden');
+    if (isTemplateSaving) return;
+    templateModal.classList.add('hidden');
+    isTemplateDirty = false;
 }
 
 function editTemplate(id) {
@@ -98,12 +116,27 @@ function editTemplate(id) {
     alert('テンプレートを編集: ' + id);
 }
 
-document.getElementById('template-form').addEventListener('submit', async (e) => {
+templateForm.addEventListener('input', () => {
+    if (!templateModal.classList.contains('hidden')) {
+        isTemplateDirty = true;
+    }
+});
+
+window.addEventListener('beforeunload', function(event) {
+    if (templateModal.classList.contains('hidden') || isTemplateSaving || !isTemplateDirty) return;
+    event.preventDefault();
+    event.returnValue = '';
+});
+
+templateForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (isTemplateSaving) return;
+
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
 
     try {
+        setTemplateSavingState(true);
         const response = await fetch('/summary/api/templates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -111,12 +144,15 @@ document.getElementById('template-form').addEventListener('submit', async (e) =>
         });
 
         if (response.ok) {
+            isTemplateDirty = false;
             window.location.reload();
         } else {
             const error = await response.json();
+            setTemplateSavingState(false);
             alert('エラー: ' + (error.detail || 'テンプレートの作成に失敗しました'));
         }
     } catch (error) {
+        setTemplateSavingState(false);
         alert('エラー: ' + error.message);
     }
 });

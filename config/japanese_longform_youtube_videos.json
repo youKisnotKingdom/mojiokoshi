@@ -1,0 +1,49 @@
+{
+  "name": "japanese_longform_lectures",
+  "playlist_url": "https://www.youtube.com/playlist?list=PLHxBhbJJasnfX6oBrkTygP8we61wEcRha",
+  "description": "日本語 ASR の長尺比較に使いやすい公開講義動画。",
+  "videos": [
+    {
+      "id": "BmtnWaUvX_0",
+      "title": "宇野重規「現代日本の保守主義：「保守」とは何か」",
+      "duration": "1:49:31",
+      "speaker": "宇野重規",
+      "jlecsponspeech_file": "utokyo_lecture_1.xlsx"
+    },
+    {
+      "id": "jkUMzOFAVV4",
+      "title": "宇野重規「政治思想史と現代社会」(2015)",
+      "duration": "1:48:08",
+      "speaker": "宇野重規",
+      "jlecsponspeech_file": "utokyo_lecture_2.xlsx"
+    },
+    {
+      "id": "ztkteH9oQJ4",
+      "title": "宇野重規「政治思想史と現代社会」(2016)",
+      "duration": "1:43:47",
+      "speaker": "宇野重規",
+      "jlecsponspeech_file": "utokyo_lecture_3.xlsx"
+    },
+    {
+      "id": "WSiPUcXNzHU",
+      "title": "吉見俊哉「新・学問のすゝめー大学は、何処から来て何処へ行くのか」",
+      "duration": "1:29:58",
+      "speaker": "吉見俊哉",
+      "jlecsponspeech_file": "utokyo_lecture_4.xlsx"
+    },
+    {
+      "id": "Uw6rKydVzX4",
+      "title": "吉見俊哉「アメリカの雲-「お茶の間のなかのニッポン」への補論-」",
+      "duration": "1:14:23",
+      "speaker": "吉見俊哉",
+      "jlecsponspeech_file": "utokyo_lecture_5.xlsx"
+    },
+    {
+      "id": "e73XbWLt5w0",
+      "title": "吉見俊哉「お茶の間のなかの「ニッポン」―アメリカのまなざしの下で―」",
+      "duration": "1:22:10",
+      "speaker": "吉見俊哉",
+      "jlecsponspeech_file": "utokyo_lecture_6.xlsx"
+    }
+  ]
+}

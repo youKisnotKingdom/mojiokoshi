@@ -112,6 +112,9 @@ def download_model(model: dict) -> str:
         "repo_type": "model",
         "resume_download": True,
     }
+    allow_patterns = model.get("allow_patterns")
+    if allow_patterns:
+        kwargs["allow_patterns"] = allow_patterns
     cache_dir = os.environ.get("HF_HOME")
     if cache_dir:
         kwargs["cache_dir"] = cache_dir

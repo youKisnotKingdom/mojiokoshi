@@ -1,0 +1,27 @@
+FROM mojiokoshi:latest
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    libsentencepiece-dev \
+    libsndfile1-dev \
+    sox \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-benchmark.txt /tmp/requirements-benchmark.txt
+
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 \
+    torch \
+    torchaudio \
+    torchvision
+
+RUN pip install --no-cache-dir -r /tmp/requirements-benchmark.txt
+
+ENV HF_HOME=/app/models
+ENV TRANSFORMERS_CACHE=/app/models
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+
+ENTRYPOINT ["/bin/bash"]
+CMD ["-lc", "sleep infinity"]

@@ -9,13 +9,20 @@
         </a>
     </div>
 
-    {% if error %}
-    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-        {{ error }}
+    <div
+        id="upload-error"
+        class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg {% if not error %}hidden{% endif %}"
+    >
+        {{ error or "" }}
     </div>
-    {% endif %}
 
-    <form method="POST" action="/transcription/upload" enctype="multipart/form-data" class="card space-y-6">
+    <form
+        id="upload-form"
+        method="POST"
+        action="/transcription/upload"
+        enctype="multipart/form-data"
+        class="card space-y-6"
+    >
         <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
         <div>
             <label for="file" class="label">音声ファイル</label>
@@ -34,10 +41,26 @@
                         </label>
                         <p class="pl-1">またはドラッグ＆ドロップ</p>
                     </div>
-                    <p class="text-xs text-gray-500">MP3, WAV, M4A, FLAC, OGG（最大500MB）</p>
+                    <p class="text-xs text-gray-500">MP3, WAV, M4A, FLAC, OGG（最大{{ max_upload_size_mb }}MB）</p>
                     <p id="file-name" class="text-sm font-medium text-primary-600 hidden"></p>
                 </div>
             </div>
+        </div>
+
+        <div id="upload-progress-wrap" class="hidden space-y-2">
+            <div class="flex items-center justify-between text-sm text-gray-600">
+                <span id="upload-progress-stage">アップロード中...</span>
+                <span id="upload-progress-text">0%</span>
+            </div>
+            <div class="h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div
+                    id="upload-progress-bar"
+                    class="h-full w-0 bg-primary-600 transition-[width] duration-200"
+                ></div>
+            </div>
+            <p class="text-xs text-amber-700">
+                送信中にページを閉じるとアップロードは中断されます。
+            </p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -87,9 +110,52 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('upload-form');
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file');
     const fileName = document.getElementById('file-name');
+    const errorBox = document.getElementById('upload-error');
+    const submitBtn = document.getElementById('submit-btn');
+    const progressWrap = document.getElementById('upload-progress-wrap');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressText = document.getElementById('upload-progress-text');
+    const progressStage = document.getElementById('upload-progress-stage');
+    let isUploading = false;
+
+    function showError(message) {
+        if (!message) {
+            errorBox.textContent = '';
+            errorBox.classList.add('hidden');
+            return;
+        }
+        errorBox.textContent = message;
+        errorBox.classList.remove('hidden');
+    }
+
+    function setUploadingState(uploading) {
+        isUploading = uploading;
+        for (const element of form.elements) {
+            if (element.type === 'hidden') continue;
+            element.disabled = uploading;
+        }
+        submitBtn.textContent = uploading ? 'アップロード中...' : 'アップロード＆文字起こし';
+    }
+
+    function setProgress(percent, stageText) {
+        const safePercent = Math.max(0, Math.min(100, percent));
+        progressWrap.classList.remove('hidden');
+        progressBar.style.width = `${safePercent}%`;
+        progressText.textContent = `${Math.round(safePercent)}%`;
+        if (stageText) {
+            progressStage.textContent = stageText;
+        }
+    }
+
+    window.addEventListener('beforeunload', function(event) {
+        if (!isUploading) return;
+        event.preventDefault();
+        event.returnValue = '';
+    });
 
     // Click to upload
     dropZone.addEventListener('click', () => fileInput.click());
@@ -121,6 +187,68 @@ document.addEventListener('DOMContentLoaded', function() {
             fileName.textContent = e.dataTransfer.files[0].name;
             fileName.classList.remove('hidden');
         }
+    });
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showError('ファイルが選択されていません');
+            return;
+        }
+
+        const formData = new FormData(form);
+        showError('');
+        setUploadingState(true);
+        setProgress(0, 'アップロード中...');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action, true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.setRequestHeader('Accept', 'application/json');
+
+        xhr.upload.addEventListener('progress', function(progressEvent) {
+            if (!progressEvent.lengthComputable) {
+                setProgress(0, 'アップロード中...');
+                progressText.textContent = '送信中';
+                return;
+            }
+            const percent = (progressEvent.loaded / progressEvent.total) * 100;
+            setProgress(percent, 'アップロード中...');
+        });
+
+        xhr.addEventListener('load', function() {
+            setUploadingState(false);
+
+            let payload = null;
+            try {
+                payload = JSON.parse(xhr.responseText);
+            } catch (_error) {
+                payload = null;
+            }
+
+            if (xhr.status >= 200 && xhr.status < 300 && payload && payload.ok && payload.redirect_url) {
+                setProgress(100, 'ジョブを作成しています...');
+                window.location.href = payload.redirect_url;
+                return;
+            }
+
+            progressWrap.classList.add('hidden');
+            showError(payload && payload.error ? payload.error : `アップロードに失敗しました (${xhr.status})`);
+        });
+
+        xhr.addEventListener('error', function() {
+            setUploadingState(false);
+            progressWrap.classList.add('hidden');
+            showError('ネットワークエラーでアップロードに失敗しました');
+        });
+
+        xhr.addEventListener('abort', function() {
+            setUploadingState(false);
+            progressWrap.classList.add('hidden');
+            showError('アップロードが中断されました');
+        });
+
+        xhr.send(formData);
     });
 });
 </script>

@@ -13,12 +13,14 @@ services:
   nginx:
     image: nginx:alpine
     container_name: mojiokoshi-nginx
+    environment:
+      - NGINX_CLIENT_MAX_BODY_SIZE=${NGINX_CLIENT_MAX_BODY_SIZE:-1g}
     ports:
       - "80:80"
       - "${HTTPS_PORT:-443}:443"
       - "${CHECKER_HTTPS_PORT:-8444}:8444"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
       - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       - web

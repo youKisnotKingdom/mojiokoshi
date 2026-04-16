@@ -18,6 +18,7 @@ class AudioRecorder {
         this.chunkUploadIntervalId = null;
         this.ws = null;
         this.chunkInterval = 10000; // 10 seconds
+        this.isStopping = false;
 
         // DOM elements
         this.timerEl = document.getElementById('timer');
@@ -34,6 +35,16 @@ class AudioRecorder {
 
         // Cleanup stale recovery state from older builds.
         localStorage.removeItem('recording_session');
+
+        window.addEventListener('beforeunload', (event) => {
+            if (!this.shouldWarnBeforeUnload()) return;
+            event.preventDefault();
+            event.returnValue = '';
+        });
+    }
+
+    shouldWarnBeforeUnload() {
+        return this.isRecording || this.isStopping || this.audioChunks.length > 0;
     }
 
     async start() {
@@ -70,6 +81,7 @@ class AudioRecorder {
             this.pausedTime = 0;
             this.chunkIndex = 0;
             this.sessionId = crypto.randomUUID();
+            this.isStopping = false;
 
             // Connect WebSocket
             this.connectWebSocket();
@@ -112,7 +124,10 @@ class AudioRecorder {
     }
 
     async stop() {
-        if (!this.mediaRecorder || !this.isRecording) return;
+        if (!this.mediaRecorder || !this.isRecording || this.isStopping) return;
+        this.isStopping = true;
+        this.updateUI('saving');
+        this.updateStatus('録音を保存中...');
 
         return new Promise((resolve) => {
             this.mediaRecorder.onstop = async () => {
@@ -156,6 +171,7 @@ class AudioRecorder {
 
                 this.isRecording = false;
                 this.isPaused = false;
+                this.isStopping = false;
                 this.updateUI('stopped');
                 this.updateStatus('録音を保存しました');
 
@@ -359,6 +375,12 @@ class AudioRecorder {
                 break;
             case 'stopped':
                 this.btnRecord.classList.remove('hidden');
+                this.btnPause.classList.add('hidden');
+                this.btnResume.classList.add('hidden');
+                this.btnStop.classList.add('hidden');
+                break;
+            case 'saving':
+                this.btnRecord.classList.add('hidden');
                 this.btnPause.classList.add('hidden');
                 this.btnResume.classList.add('hidden');
                 this.btnStop.classList.add('hidden');

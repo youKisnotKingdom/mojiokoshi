@@ -69,3 +69,10 @@ Thumbs.db
 # SSL証明書（自己署名・環境ごとに生成）
 nginx/certs/*.crt
 nginx/certs/*.key
+
+# Benchmark artifacts and local model caches
+benchmark_data/
+benchmark_datasets/
+benchmarks/
+hf_cache_canary_http/
+hf_cache_user/

@@ -56,9 +56,9 @@
                 >
                     コピー
                 </button>
-                <form action="/summary/api/transcription/{{ job.id }}/summarize" method="POST" class="inline">
+                <form action="/summary/api/transcription/{{ job.id }}/summarize" method="POST" class="inline js-summary-form">
                     <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
-                    <button type="submit" class="btn btn-primary text-sm">
+                    <button type="submit" class="btn btn-primary text-sm js-summary-submit">
                         要約
                     </button>
                 </form>
@@ -120,6 +120,23 @@
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.summary-preview[data-raw]').forEach(function(el) {
         el.innerHTML = marked.parse(el.dataset.raw);
+    });
+
+    document.querySelectorAll('.js-summary-form').forEach(function(form) {
+        form.addEventListener('submit', function(event) {
+            if (form.dataset.submitting === 'true') {
+                event.preventDefault();
+                return;
+            }
+
+            form.dataset.submitting = 'true';
+            const submitButton = form.querySelector('.js-summary-submit');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = '要約作成中...';
+                submitButton.classList.add('opacity-70', 'cursor-not-allowed');
+            }
+        });
     });
 });
 

@@ -12,6 +12,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-}
       - UPLOAD_DIR=/app/uploads
+      - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-1073741824}
       - LLM_API_BASE_URL=${LLM_API_BASE_URL:?LLM_API_BASE_URL is required}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
