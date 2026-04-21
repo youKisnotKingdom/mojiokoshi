@@ -1,13 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}履歴 - {{ title }}{% endblock %}
+{% block title %}{{ history_title }} - {{ title }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-900">文字起こし履歴</h1>
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ history_title }}</h1>
+            <p class="text-sm text-gray-500 mt-1">処理方式ごとに履歴を分けて表示します。</p>
+        </div>
         <a href="/transcription" class="btn btn-primary">
             新規文字起こし
+        </a>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+        <a href="/history/uploads" class="px-4 py-2 rounded-lg text-sm font-medium border {% if active_history_source == 'upload' %}bg-primary-600 text-white border-primary-600{% else %}bg-white text-gray-700 border-gray-300 hover:border-gray-400{% endif %}">
+            アップロード履歴 ({{ upload_count }})
+        </a>
+        <a href="/history/recordings" class="px-4 py-2 rounded-lg text-sm font-medium border {% if active_history_source == 'recording' %}bg-primary-600 text-white border-primary-600{% else %}bg-white text-gray-700 border-gray-300 hover:border-gray-400{% endif %}">
+            録音履歴 ({{ recording_count }})
         </a>
     </div>
 
@@ -19,9 +31,6 @@
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             ファイル
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            ソース
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             ステータス
@@ -37,49 +46,33 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for job in jobs %}
                     <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-6 py-4">
                             <div class="flex items-center">
                                 <svg class="w-5 h-5 text-gray-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
                                 </svg>
                                 <div>
-                                    <div class="text-sm font-medium text-gray-900">
+                                    <div class="text-sm font-medium text-gray-900 break-all">
                                         {{ job.audio_file.original_filename if job.audio_file else 'N/A' }}
                                     </div>
                                     <div class="text-xs text-gray-500">
                                         {{ job.engine.value }} / {{ job.model_size }}
+                                        {% if job.audio_file and job.audio_file.duration_seconds %}
+                                        / {{ job.audio_file.duration_display }}
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            {% if job.audio_file and job.audio_file.source.value == 'upload' %}
-                            <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                                アップロード
-                            </span>
-                            {% else %}
-                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                                録音
-                            </span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
                             {% if job.status.value == 'pending' %}
-                            <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
-                                待機中
-                            </span>
+                            <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">待機中</span>
                             {% elif job.status.value == 'processing' %}
-                            <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                                処理中
-                            </span>
+                            <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">処理中</span>
                             {% elif job.status.value == 'completed' %}
-                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                                完了
-                            </span>
+                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">完了</span>
                             {% elif job.status.value == 'failed' %}
-                            <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                                失敗
-                            </span>
+                            <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">失敗</span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -93,6 +86,7 @@
                                 <form action="/transcription/job/{{ job.id }}/delete" method="POST"
                                       onsubmit="return confirm('このジョブと音声ファイルを削除しますか？この操作は元に戻せません。')">
                                     <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
+                                    <input type="hidden" name="next_url" value="{{ history_path }}">
                                     <button type="submit" class="text-red-600 hover:text-red-700">
                                         削除
                                     </button>
@@ -106,7 +100,6 @@
         </div>
     </div>
 
-    <!-- Pagination -->
     {% if total_pages > 1 %}
     <div class="flex items-center justify-between">
         <div class="text-sm text-gray-500">
@@ -114,14 +107,10 @@
         </div>
         <div class="flex space-x-2">
             {% if page > 1 %}
-            <a href="/history?page={{ page - 1 }}" class="btn btn-secondary text-sm">
-                前へ
-            </a>
+            <a href="{{ history_path }}?page={{ page - 1 }}" class="btn btn-secondary text-sm">前へ</a>
             {% endif %}
             {% if page < total_pages %}
-            <a href="/history?page={{ page + 1 }}" class="btn btn-secondary text-sm">
-                次へ
-            </a>
+            <a href="{{ history_path }}?page={{ page + 1 }}" class="btn btn-secondary text-sm">次へ</a>
             {% endif %}
         </div>
     </div>
@@ -132,11 +121,20 @@
         <svg class="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
         </svg>
-        <h3 class="mt-4 text-lg font-medium text-gray-900">文字起こしデータがありません</h3>
-        <p class="mt-2 text-gray-500">音声ファイルをアップロードするか、録音を開始してください。</p>
-        <a href="/transcription" class="btn btn-primary mt-4 inline-block">
-            文字起こしを開始
-        </a>
+        {% if active_history_source == 'upload' %}
+        <h3 class="mt-4 text-lg font-medium text-gray-900">アップロード履歴がありません</h3>
+        <p class="mt-2 text-gray-500">音声ファイルをアップロードすると、ここに履歴が表示されます。</p>
+        <a href="/transcription/upload" class="btn btn-primary mt-4 inline-block">ファイルをアップロード</a>
+        {% else %}
+        <h3 class="mt-4 text-lg font-medium text-gray-900">録音履歴がありません</h3>
+        {% if enable_realtime_transcription %}
+        <p class="mt-2 text-gray-500">ブラウザ録音を開始すると、ここに履歴が表示されます。</p>
+        <a href="/transcription/record" class="btn btn-primary mt-4 inline-block">録音ページへ</a>
+        {% else %}
+        <p class="mt-2 text-gray-500">この環境ではリアルタイム録音を無効化しています。録音履歴は利用できません。</p>
+        <a href="/transcription/upload" class="btn btn-primary mt-4 inline-block">アップロード文字起こしへ</a>
+        {% endif %}
+        {% endif %}
     </div>
     {% endif %}
 </div>

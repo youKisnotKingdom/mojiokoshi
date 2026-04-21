@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     whisper_model_size: str = "medium"
     whisper_device: str = "cpu"
     whisper_language: str = "ja"
+    enable_realtime_transcription: bool = True
 
 
 @lru_cache

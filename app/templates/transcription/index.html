@@ -7,36 +7,28 @@
         <p class="text-gray-600 mt-2">音声の入力方法を選択してください</p>
     </div>
 
+    {% if enable_realtime_transcription %}
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-4xl mx-auto">
+        <p class="text-sm text-amber-800">
+            リアルタイム録音は実験機能です。安定運用を優先する場合は、アップロード文字起こしを主導線として利用してください。
+        </p>
+    </div>
     <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
         <a href="/transcription/record" class="card hover:shadow-lg transition-shadow group">
+            <div class="flex items-center justify-center gap-2 mb-4">
+                <span class="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">実験機能</span>
+            </div>
             <div class="text-primary-600 mb-4 group-hover:scale-110 transition-transform">
                 <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
                 </svg>
             </div>
             <h2 class="text-xl font-semibold text-gray-900 mb-2 text-center">音声録音</h2>
-            <p class="text-gray-600 text-center">
-                ブラウザから直接録音し、リアルタイムで文字起こしを行います。
-            </p>
+            <p class="text-gray-600 text-center">ブラウザから直接録音し、リアルタイムで文字起こしを行います。</p>
             <ul class="mt-4 text-sm text-gray-500 space-y-1">
-                <li class="flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    リアルタイム文字起こし
-                </li>
-                <li class="flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    一時停止・再開
-                </li>
-                <li class="flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    自動保存
-                </li>
+                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>リアルタイム文字起こし</li>
+                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>一時停止・再開</li>
+                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>自動保存</li>
             </ul>
         </a>
 
@@ -47,30 +39,31 @@
                 </svg>
             </div>
             <h2 class="text-xl font-semibold text-gray-900 mb-2 text-center">ファイルアップロード</h2>
-            <p class="text-gray-600 text-center">
-                既存の音声ファイルをアップロードして文字起こしを行います。
-            </p>
+            <p class="text-gray-600 text-center">既存の音声ファイルをアップロードして文字起こしを行います。</p>
             <ul class="mt-4 text-sm text-gray-500 space-y-1">
-                <li class="flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    MP3, WAV, M4A, FLAC, OGG対応
-                </li>
-                <li class="flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    ドラッグ＆ドロップ対応
-                </li>
-                <li class="flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    大容量ファイル対応
-                </li>
+                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>MP3, WAV, M4A, FLAC, OGG対応</li>
+                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>ドラッグ＆ドロップ対応</li>
+                <li class="flex items-center"><svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>大容量ファイル対応</li>
             </ul>
         </a>
     </div>
+    {% else %}
+    <div class="max-w-3xl mx-auto space-y-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p class="text-sm text-blue-800">
+                この環境では安定運用のため、リアルタイム録音を無効化しています。アップロード文字起こしのみ利用できます。
+            </p>
+        </div>
+        <a href="/transcription/upload" class="card hover:shadow-lg transition-shadow group block">
+            <div class="text-primary-600 mb-4 group-hover:scale-110 transition-transform">
+                <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2 text-center">ファイルアップロード</h2>
+            <p class="text-gray-600 text-center">既存の音声ファイルをアップロードして文字起こしを行います。</p>
+        </a>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

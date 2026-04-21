@@ -46,6 +46,16 @@ def _is_ajax_upload(request: Request) -> bool:
     return request.headers.get("x-requested-with") == "XMLHttpRequest"
 
 
+def _is_safe_internal_url(next_url: str | None) -> bool:
+    return bool(next_url) and next_url.startswith("/") and not next_url.startswith("//")
+
+
+def _history_url_for_source(source: AudioSource | None) -> str:
+    if source == AudioSource.RECORDING:
+        return "/history/recordings"
+    return "/history/uploads"
+
+
 def _upload_error_response(
     request: Request,
     current_user: User,
@@ -80,6 +90,7 @@ async def transcription_page(
             "request": request,
             "title": "文字起こし",
             "current_user": current_user,
+            "enable_realtime_transcription": settings.enable_realtime_transcription,
         },
     )
 
@@ -208,6 +219,9 @@ async def record_page(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Recording page."""
+    if not settings.enable_realtime_transcription:
+        raise HTTPException(status_code=404, detail="リアルタイム録音は無効です")
+
     return templates.TemplateResponse(
         "transcription/record.html",
         {
@@ -244,6 +258,8 @@ async def job_detail_page(
     )
     summaries = db.execute(summary_stmt).scalars().all()
 
+    history_url = _history_url_for_source(job.audio_file.source if job.audio_file else None)
+
     return templates.TemplateResponse(
         "transcription/job_detail.html",
         {
@@ -252,6 +268,7 @@ async def job_detail_page(
             "current_user": current_user,
             "job": job,
             "summaries": summaries,
+            "history_url": history_url,
         },
     )
 
@@ -290,6 +307,7 @@ async def delete_job(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     csrf_token: Annotated[str, Form()] = "",
+    next_url: Annotated[str | None, Form()] = None,
 ):
     """Delete a transcription job and its associated audio file."""
     from fastapi.responses import RedirectResponse
@@ -306,6 +324,8 @@ async def delete_job(
     if not job:
         raise HTTPException(status_code=404, detail="ジョブが見つかりません")
 
+    redirect_url = next_url if _is_safe_internal_url(next_url) else _history_url_for_source(job.audio_file.source if job.audio_file else None)
+
     # Delete associated audio file (cascades to job and summaries)
     if job.audio_file:
         audio_file = job.audio_file
@@ -321,7 +341,7 @@ async def delete_job(
         db.delete(job)
 
     db.commit()
-    return RedirectResponse(url="/history", status_code=303)
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 # API endpoints
