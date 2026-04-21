@@ -1,0 +1,10 @@
+FROM mojiokoshi-asr-benchmark:latest
+
+RUN pip install --no-cache-dir "qwen-asr[vllm]==0.0.6"
+
+ENV HF_HOME=/app/models
+ENV TRANSFORMERS_CACHE=/app/models
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+
+ENTRYPOINT ["/bin/bash"]
+CMD ["-lc", "sleep infinity"]

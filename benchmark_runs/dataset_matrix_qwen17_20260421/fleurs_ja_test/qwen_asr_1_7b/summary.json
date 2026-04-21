@@ -1,0 +1,20 @@
+[
+  {
+    "dataset_name": "fleurs_ja_test",
+    "model_alias": "qwen_asr_1_7b",
+    "repo_id": "Qwen/Qwen3-ASR-1.7B",
+    "num_items": 500,
+    "total_audio_s": 6621.839999999999,
+    "total_wall_s": 359.0299631836824,
+    "real_time_factor": 0.05421906346025915,
+    "x_realtime": 18.44369740419748,
+    "reference_metrics": {
+      "cer": 0.10876098012020342,
+      "wer": 1.134,
+      "method": "rapidfuzz"
+    },
+    "gpu_memory_after_load_mb": 14749,
+    "gpu_memory_after_run_mb": 15577,
+    "torch_peak_reserved_mb": 8586
+  }
+]

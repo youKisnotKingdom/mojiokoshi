@@ -54,3 +54,6 @@ python scripts/run_eval_dataset_matrix.py --datasets jsut_basic5000_test reazons
 - `reazon_zipformer` / `reazon_hubert_k2`: `transformers`, `torch`, `librosa`, `numpy` が必要です。
 - `reazon_nemo_v2`: `reazonspeech-nemo-asr` と `nemo_toolkit['asr']` が必要です。ローカル `.nemo` checkpoint 直読みでオフライン比較できます。
 - `canary_1b_flash`: 公開ローカル checkpoint は `en/de/es/fr` のみで、日本語比較対象には使えません。
+
+結果サマリ:
+- [ASR_BENCHMARK_SUMMARY.md](/home/ykadono/dev/mojiokoshi/docs/ASR_BENCHMARK_SUMMARY.md:1)

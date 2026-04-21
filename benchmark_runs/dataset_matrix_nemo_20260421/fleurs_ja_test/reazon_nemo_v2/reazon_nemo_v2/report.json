@@ -1,0 +1,18 @@
+{
+  "dataset_name": "fleurs_ja_test",
+  "model_alias": "reazon_nemo_v2",
+  "repo_id": "reazon-research/reazonspeech-nemo-v2",
+  "num_items": 500,
+  "total_audio_s": 6621.839999999999,
+  "total_wall_s": 179.14349478995427,
+  "real_time_factor": 0.027053431491844304,
+  "x_realtime": 36.96388756825419,
+  "reference_metrics": {
+    "cer": 0.09743411927877947,
+    "wer": 1.0,
+    "method": "rapidfuzz"
+  },
+  "gpu_memory_after_load_mb": 11713,
+  "gpu_memory_after_run_mb": 11865,
+  "torch_peak_reserved_mb": 4870
+}

@@ -219,6 +219,21 @@ def resolve_cached_model_source(repo_id: str) -> str:
         normalized_roots.append(candidate)
 
     repo_cache_dir_name = f"models--{repo_id.replace('/', '--')}"
+
+    def snapshot_looks_complete(snapshot_path: Path) -> bool:
+        required_markers = (
+            "config.json",
+            "tokenizer_config.json",
+            "processor_config.json",
+            "preprocessor_config.json",
+            "model.safetensors",
+        )
+        if any((snapshot_path / marker).exists() for marker in required_markers):
+            return True
+        if list(snapshot_path.glob("*.nemo")):
+            return True
+        return False
+
     for root in normalized_roots:
         snapshots_dir = root / repo_cache_dir_name / "snapshots"
         if not snapshots_dir.exists():
@@ -229,8 +244,9 @@ def resolve_cached_model_source(repo_id: str) -> str:
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )
-        if snapshots:
-            return str(snapshots[0])
+        for snapshot in snapshots:
+            if snapshot_looks_complete(snapshot):
+                return str(snapshot)
 
     return repo_id
 
@@ -451,7 +467,7 @@ class ReazonZipformerAdapter:
 
         self.device = device
         model_source = resolve_cached_model_source(repo_id)
-        self.processor = AutoProcessor.from_pretrained(model_source)
+        self.processor = AutoProcessor.from_pretrained(model_source, trust_remote_code=True)
         self.model = AutoModelForCTC.from_pretrained(
             model_source,
             trust_remote_code=True,
@@ -504,15 +520,9 @@ class ReazonNemoAdapter:
         self.model.eval()
 
     def transcribe(self, audio_path: Path, language: str | None) -> str:
-        try:
-            from reazonspeech.nemo.asr import audio_from_path, transcribe
-        except ImportError as exc:
-            raise SystemExit(
-                "Reazon NeMo ランタイムが見つかりません。`reazonspeech-nemo-asr` をインストールしてください。"
-            ) from exc
-
-        result = transcribe(self.model, audio_from_path(str(audio_path)))
-        return result.text.strip()
+        result = self.model.transcribe([str(audio_path)], batch_size=1)
+        item = result[0]
+        return getattr(item, "text", str(item)).strip()
 
 
 class ParakeetAdapter:
