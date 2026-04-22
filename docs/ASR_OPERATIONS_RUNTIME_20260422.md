@@ -12,6 +12,8 @@
   - [1job c1](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1job_c1.json:1)
   - [2job c1](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_2job_c1.json:1)
   - [2job c2](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_2job_c2.json:1)
+  - [5job c1](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_5job_c1.json:1)
+  - [5job c2](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_5job_c2.json:1)
 - モデル別待ち時間レポート: [ASR_OPERATIONS_CONCURRENCY_20260421.md](/home/ykadono/dev/mojiokoshi/docs/ASR_OPERATIONS_CONCURRENCY_20260421.md:1)
 
 ## 現行デプロイ構成
@@ -57,14 +59,16 @@
 
 結果:
 - 最初の claim: 成功
-- その後の再claim: `[]`
-- job status: `processing` のまま
+- stale timeout 超過後の recovery: 成功
+- その後の再claim: 同じ job を再取得
+- job status: `processing` へ再遷移
 
 要点:
-- 現在は `PROCESSING` に入った job を自動回収しない
-- worker / container が落ちると、job は **手動復旧まで詰まる**
+- `PROCESSING` に入ったまま timeout を超えた job は自動で `PENDING` に戻る
+- worker / container が落ちても、timeout 後に再取得できる
+- ただし timeout を短くしすぎると、正常に長く動いている job を誤回収する可能性がある
 
-これは現状の最大の運用リスクです。
+現状の実装では、`transcription=3600s`, `summary=1800s` を既定値にしています。
 
 ## 3. 現行 worker の実効スループット
 
@@ -122,6 +126,32 @@ job ごとの終了時刻:
 - `WORKER_TRANSCRIPTION_CONCURRENCY=2` を上げても、今の実装では性能改善は期待しにくい
 - 真面目に並列化するなら、別 process / 別 worker での実行が前提
 
+## 3.5 5 job 同時投入の短い queue 実測
+
+同じ 30 秒サンプルを 5 件同時投入し、短い job がどう待つかも確認しました。
+
+### 5 job, concurrency=1
+
+- 条件: `jobs=5`, `concurrency=1`
+- 実測: `15.237秒`
+
+挙動:
+- 1 件目は cold start を含み約 `13.7秒`
+- 残り 4 件は warm state で合計約 `1.5秒`
+
+### 5 job, concurrency=2
+
+- 条件: `jobs=5`, `concurrency=2`
+- 実測: `14.884秒`
+
+挙動:
+- 最初の 2 件は同時に `processing` へ入る
+- ただし全体時間は `concurrency=1` とほぼ同じ
+
+要点:
+- 短い job が大量に来ても、cold start さえ抜ければ queue はすぐ流れる
+- ただし `concurrency=2` を上げても、同一 process 内では wall time はほぼ縮まらない
+
 ## 4. 実運用で読むべき値
 
 実運用では 2 種類の時間を分けて見る必要があります。
@@ -148,13 +178,13 @@ job ごとの終了時刻:
 - `SKIP LOCKED` により、複数 worker 化の土台はできた
 - 現行 batch 本番経路は `Parakeet JA / GPU / worker 1本`
 - ただし 1 process 内の `concurrency` を上げても実効並列にはなりにくい
-- さらに、worker が途中で落ちた job は現在自動回収されない
+- worker が途中で落ちた job も、stale timeout 後に再取得できる
 
 ## 6. 次の実装優先順位
 
-1. `stale PROCESSING` job の再キュー化
+1. queue 長 / 待ち時間 / 処理時間の可視化
 2. worker の別 process 並列を前提にした構成整理
-3. queue 長 / 待ち時間 / 処理時間の可視化
+3. stuck job の管理画面 / 手動再投入導線
 4. 必要なら `Cohere` を batch engine 候補として再計測
 
 ## 7. 推奨判断
@@ -164,6 +194,7 @@ job ごとの終了時刻:
 - 本番 batch engine: `Parakeet`
 - `realtime` は分離し、当面 `off`
 - queue の安全性は `SKIP LOCKED` で確保
+- worker crash 後の stuck job は timeout ベースで自動回収
 
-次に優先すべきなのは性能より **耐障害性** です。  
-具体的には、`stale job recovery` を先に入れるべきです。
+次に優先すべきなのは **運用の見える化** です。  
+具体的には、queue の長さと待ち時間を UI や監視で見えるようにするべきです。

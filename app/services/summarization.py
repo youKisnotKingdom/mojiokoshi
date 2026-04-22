@@ -1,6 +1,7 @@
 """
 Summarization service using OpenAI-compatible LLM API.
 """
+from datetime import timedelta
 import logging
 import uuid
 
@@ -102,6 +103,49 @@ def claim_pending_summaries(db: Session, limit: int = 1) -> list[uuid.UUID]:
 
     db.commit()
     return claimed_ids
+
+
+def requeue_stale_processing_summaries(db: Session, stale_after_seconds: int) -> list[uuid.UUID]:
+    """Return long-stuck processing summaries back to pending."""
+    if stale_after_seconds <= 0:
+        return []
+
+    from sqlalchemy import select
+
+    cutoff = utc_now() - timedelta(seconds=stale_after_seconds)
+    stmt = (
+        select(Summary)
+        .where(Summary.status == SummaryStatus.PROCESSING)
+        .where(Summary.started_at.is_not(None))
+        .where(Summary.started_at < cutoff)
+        .with_for_update(skip_locked=True)
+    )
+    summaries = list(db.execute(stmt).scalars().all())
+    if not summaries:
+        return []
+
+    now = utc_now()
+    recovered_ids: list[uuid.UUID] = []
+    for summary in summaries:
+        summary.status = SummaryStatus.PENDING
+        summary.started_at = None
+        summary.completed_at = None
+        message = (
+            f"Recovered from stale processing state at {now.isoformat()} "
+            f"after exceeding {stale_after_seconds}s timeout."
+        )
+        summary.error_message = (
+            f"{summary.error_message}\n{message}" if summary.error_message else message
+        )
+        recovered_ids.append(summary.id)
+
+    db.commit()
+    logger.warning(
+        "Re-queued %d stale summary job(s): %s",
+        len(recovered_ids),
+        ", ".join(str(summary_id) for summary_id in recovered_ids),
+    )
+    return recovered_ids
 
 
 def load_summary_for_processing(db: Session, summary_id: uuid.UUID) -> Summary | None:

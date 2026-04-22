@@ -42,6 +42,9 @@ async def process_transcription_jobs(poll_interval: float = 5.0, concurrency: in
     """Claim and process pending transcription jobs."""
     db = SessionLocal()
     try:
+        transcription.requeue_stale_processing_jobs(
+            db, settings.worker_transcription_stale_timeout_seconds
+        )
         job_ids = transcription.claim_pending_jobs(db, limit=concurrency)
     except Exception as e:
         logger.error("Error claiming transcription jobs: %s", e)
@@ -69,6 +72,9 @@ async def process_summary_jobs(poll_interval: float = 5.0, concurrency: int = 1)
     """Claim and process pending summary jobs."""
     db = SessionLocal()
     try:
+        summarization.requeue_stale_processing_summaries(
+            db, settings.worker_summary_stale_timeout_seconds
+        )
         summary_ids = summarization.claim_pending_summaries(db, limit=concurrency)
     except Exception as e:
         logger.error("Error claiming summary jobs: %s", e)
@@ -103,10 +109,15 @@ async def worker_loop(poll_interval: float | None = None):
     summary_concurrency = max(1, settings.worker_summary_concurrency)
 
     logger.info(
-        "Worker started (poll_interval=%.1fs, transcription_concurrency=%d, summary_concurrency=%d)",
+        (
+            "Worker started (poll_interval=%.1fs, transcription_concurrency=%d, "
+            "summary_concurrency=%d, transcription_stale_timeout=%ds, summary_stale_timeout=%ds)"
+        ),
         poll_interval,
         transcription_concurrency,
         summary_concurrency,
+        settings.worker_transcription_stale_timeout_seconds,
+        settings.worker_summary_stale_timeout_seconds,
     )
 
     while _running:

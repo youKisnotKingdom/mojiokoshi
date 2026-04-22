@@ -1,0 +1,57 @@
+{
+  "audio": "/tmp/ops-sample.wav",
+  "jobs_requested": 5,
+  "jobs_processed": 5,
+  "concurrency": 2,
+  "poll_interval": 0.1,
+  "elapsed_seconds": 14.884,
+  "settings": {
+    "default_transcription_engine": "parakeet_ja",
+    "whisper_model_size": "medium",
+    "whisper_device": "cpu",
+    "engine": "parakeet_ja",
+    "model_size": "nvidia/parakeet-tdt_ctc-0.6b-ja"
+  },
+  "jobs": [
+    {
+      "job_id": "8df2ed2f-a637-4203-b557-2834acba97a3",
+      "status": "completed",
+      "started_at": "2026-04-22T11:22:33.580039+00:00",
+      "completed_at": "2026-04-22T11:22:47.227495+00:00",
+      "error_message": null,
+      "result_text_length": 153
+    },
+    {
+      "job_id": "28d54ca9-3985-4690-a36f-7074af403ec4",
+      "status": "completed",
+      "started_at": "2026-04-22T11:22:33.580039+00:00",
+      "completed_at": "2026-04-22T11:22:47.335453+00:00",
+      "error_message": null,
+      "result_text_length": 153
+    },
+    {
+      "job_id": "b2b53c1e-d6b5-4866-98d4-981c08d80607",
+      "status": "completed",
+      "started_at": "2026-04-22T11:22:47.446539+00:00",
+      "completed_at": "2026-04-22T11:22:47.679254+00:00",
+      "error_message": null,
+      "result_text_length": 153
+    },
+    {
+      "job_id": "063a921e-9fe4-4bbd-91f1-c04ffeed3e26",
+      "status": "completed",
+      "started_at": "2026-04-22T11:22:47.446539+00:00",
+      "completed_at": "2026-04-22T11:22:47.965271+00:00",
+      "error_message": null,
+      "result_text_length": 153
+    },
+    {
+      "job_id": "9e635d95-03e7-4235-9db6-1eb8d8aedfcf",
+      "status": "completed",
+      "started_at": "2026-04-22T11:22:48.074876+00:00",
+      "completed_at": "2026-04-22T11:22:48.348935+00:00",
+      "error_message": null,
+      "result_text_length": 153
+    }
+  ]
+}

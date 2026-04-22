@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Demonstrate current stuck-processing behavior for claimed jobs."""
+"""Demonstrate stale-processing recovery for claimed jobs."""
 
 from __future__ import annotations
 
 import json
 import uuid
+from datetime import timedelta
 from pathlib import Path
 
 from app.database import SessionLocal
 from app.models import AudioFile, AudioSource, TranscriptionEngine, TranscriptionJob, TranscriptionStatus
-from app.services.transcription import claim_pending_jobs
+from app.services.transcription import claim_pending_jobs, requeue_stale_processing_jobs
 from app.time_utils import utc_now
 
 OUTPUT = Path("benchmark_runs/stale_job_recovery_test_20260422.json")
@@ -71,6 +72,23 @@ def main() -> None:
         finally:
             db.close()
 
+        backdate_db = SessionLocal()
+        try:
+            job = backdate_db.get(TranscriptionJob, job_id)
+            if job:
+                job.started_at = utc_now() - timedelta(hours=2)
+                backdate_db.commit()
+        finally:
+            backdate_db.close()
+
+        recovery_db = SessionLocal()
+        try:
+            recovered = [
+                str(x) for x in requeue_stale_processing_jobs(recovery_db, stale_after_seconds=60)
+            ]
+        finally:
+            recovery_db.close()
+
         second_db = SessionLocal()
         try:
             second_claim = [str(x) for x in claim_pending_jobs(second_db, limit=1)]
@@ -84,12 +102,14 @@ def main() -> None:
                 "tag": TAG,
                 "job_id": job_id,
                 "first_claim": claimed,
+                "recovered_jobs": recovered,
                 "second_claim_after_simulated_crash": second_claim,
-                "job_status_after_abandon": job.status.value if job else None,
-                "started_at_after_abandon": job.started_at.isoformat() if job and job.started_at else None,
+                "job_status_after_recovery": job.status.value if job else None,
+                "started_at_after_recovery": job.started_at.isoformat() if job and job.started_at else None,
+                "error_message_after_recovery": job.error_message if job else None,
                 "summary": {
-                    "stuck_processing": bool(job and job.status == TranscriptionStatus.PROCESSING),
-                    "reclaimable_without_manual_reset": bool(second_claim),
+                    "recovered_before_reclaim": bool(recovered),
+                    "reclaimable_after_recovery": bool(second_claim),
                 },
             }
         finally:

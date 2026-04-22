@@ -1,14 +1,20 @@
 {
   "tag": "stale-job-test-20260422",
-  "job_id": "1ef78898-06b4-44e1-a63c-a141be2e1bb5",
+  "job_id": "5b34f04d-e258-4a80-b6b3-203718d8813d",
   "first_claim": [
-    "1ef78898-06b4-44e1-a63c-a141be2e1bb5"
+    "5b34f04d-e258-4a80-b6b3-203718d8813d"
   ],
-  "second_claim_after_simulated_crash": [],
-  "job_status_after_abandon": "processing",
-  "started_at_after_abandon": "2026-04-22T10:18:14.741411+00:00",
+  "recovered_jobs": [
+    "5b34f04d-e258-4a80-b6b3-203718d8813d"
+  ],
+  "second_claim_after_simulated_crash": [
+    "5b34f04d-e258-4a80-b6b3-203718d8813d"
+  ],
+  "job_status_after_recovery": "processing",
+  "started_at_after_recovery": "2026-04-22T11:23:22.692002+00:00",
+  "error_message_after_recovery": null,
   "summary": {
-    "stuck_processing": true,
-    "reclaimable_without_manual_reset": false
+    "recovered_before_reclaim": true,
+    "reclaimable_after_recovery": true
   }
 }

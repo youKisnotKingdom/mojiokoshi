@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     worker_poll_interval: float = 5.0
     worker_transcription_concurrency: int = 1
     worker_summary_concurrency: int = 1
+    worker_transcription_stale_timeout_seconds: int = 3600
+    worker_summary_stale_timeout_seconds: int = 1800
 
 
 @lru_cache

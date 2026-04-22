@@ -1,5 +1,6 @@
 """Transcription service for batch audio transcription."""
 import asyncio
+from datetime import timedelta
 import logging
 import uuid
 from pathlib import Path
@@ -202,6 +203,50 @@ def claim_pending_jobs(db: Session, limit: int = 1) -> list[uuid.UUID]:
 
     db.commit()
     return claimed_ids
+
+
+def requeue_stale_processing_jobs(db: Session, stale_after_seconds: int) -> list[uuid.UUID]:
+    """Return long-stuck processing jobs back to pending."""
+    if stale_after_seconds <= 0:
+        return []
+
+    from sqlalchemy import select
+
+    cutoff = utc_now() - timedelta(seconds=stale_after_seconds)
+    stmt = (
+        select(TranscriptionJob)
+        .where(TranscriptionJob.status == TranscriptionStatus.PROCESSING)
+        .where(TranscriptionJob.started_at.is_not(None))
+        .where(TranscriptionJob.started_at < cutoff)
+        .with_for_update(skip_locked=True)
+    )
+    jobs = list(db.execute(stmt).scalars().all())
+    if not jobs:
+        return []
+
+    now = utc_now()
+    recovered_ids: list[uuid.UUID] = []
+    for job in jobs:
+        job.status = TranscriptionStatus.PENDING
+        job.started_at = None
+        job.completed_at = None
+        job.progress_percent = 0.0
+        message = (
+            f"Recovered from stale processing state at {now.isoformat()} "
+            f"after exceeding {stale_after_seconds}s timeout."
+        )
+        job.error_message = (
+            f"{job.error_message}\n{message}" if job.error_message else message
+        )
+        recovered_ids.append(job.id)
+
+    db.commit()
+    logger.warning(
+        "Re-queued %d stale transcription job(s): %s",
+        len(recovered_ids),
+        ", ".join(str(job_id) for job_id in recovered_ids),
+    )
+    return recovered_ids
 
 
 def load_job_for_processing(db: Session, job_id: uuid.UUID) -> TranscriptionJob | None:
