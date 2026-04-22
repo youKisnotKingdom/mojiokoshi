@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "cohere_transcribe",
+    "repo_id": "CohereLabs/cohere-transcribe-03-2026",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 2.2070736535824835,
+    "real_time_factor": 0.07356912178608278,
+    "x_realtime": 13.592659198891946,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-4h07k92t/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 2.1767192352563143,
+        "text": "自分が一人で病院に行ってやるっていうのは、いろんなとこに行って、なんか、じゃあやりましょうよみたいな感じで、あの、無料の、無料のっていうか変だけど、客員、研究員とかバンって渡されて、渡してもらって、で、それで、展開の中のところもらっててやるんですけど、まあ僕、目的としてはみんなで、皆さんで、研究室みんなで行きたいっていうのがずっとあって、で、もともとはご存知の方が多いと思うけど、ハリヒメでそれを狙っていたとできたときに。で、計算機を入れたし、僕も行けたけど、"
+      }
+    ],
+    "gpu_memory_after_load_mb": 12362,
+    "gpu_memory_after_run_mb": 12572,
+    "torch_peak_reserved_mb": 4468
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "audio": "/tmp/ops-sample.wav",
+  "jobs_requested": 2,
+  "jobs_processed": 2,
+  "concurrency": 1,
+  "poll_interval": 0.1,
+  "elapsed_seconds": 13.127,
+  "settings": {
+    "default_transcription_engine": "parakeet_ja",
+    "whisper_model_size": "medium",
+    "whisper_device": "cuda",
+    "engine": "parakeet_ja",
+    "model_size": "nvidia/parakeet-tdt_ctc-0.6b-ja"
+  },
+  "jobs": [
+    {
+      "job_id": "1324bc2e-cd83-46db-8b6f-e23d5df372a4",
+      "status": "completed",
+      "started_at": "2026-04-22T10:52:44.611424+00:00",
+      "completed_at": "2026-04-22T10:52:57.231602+00:00",
+      "error_message": null,
+      "result_text_length": 153
+    },
+    {
+      "job_id": "d6f554fd-613a-4450-83c0-3b4efb8738fd",
+      "status": "completed",
+      "started_at": "2026-04-22T10:52:57.342732+00:00",
+      "completed_at": "2026-04-22T10:52:57.605317+00:00",
+      "error_message": null,
+      "result_text_length": 153
+    }
+  ]
+}

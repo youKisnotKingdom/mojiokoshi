@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.8280934612266719,
+    "real_time_factor": 0.027603115374222397,
+    "x_realtime": 36.22779481383705,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-_xu72kkb/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.7942005880177021,
+        "text": "自分が一人で病院に行ってやるっていうのはいろんなとこに行って何かじゃあやりましょうよみたいな感じで無料の無料のっていうか言うと変だけど客員研究員とこバンって渡されて渡してもらってそれで天からの仲間ともらってってやるんですけど僕目的としてはみんなで皆さんで研究室みんなで行きたいっていうのがずっとあってもともとはご存じの方が多いと思うけどハリヒメでそれをねらっていたとできた時に。で計算機を入れれたし僕も行けたけど。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 12912,
+    "gpu_memory_after_run_mb": 10648,
+    "torch_peak_reserved_mb": 4988
+  }
+]

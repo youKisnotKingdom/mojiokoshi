@@ -4,7 +4,6 @@ Background worker for processing transcription and summarization jobs.
 import asyncio
 import logging
 import signal
-import sys
 
 from app.config import get_settings
 from app.database import SessionLocal
@@ -13,18 +12,16 @@ from app.services import cleanup, summarization, transcription
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-# Worker state
 _running = False
 _cleanup_counter = 0
-CLEANUP_INTERVAL = 720  # Run cleanup every 720 polls (~1 hour at 5s interval)
-
-
+CLEANUP_INTERVAL = 720
 MAX_RETRIES = 3
 
 
 async def _with_retry(coro_fn, job_id, job_type: str, poll_interval: float):
     """Run a coroutine with exponential backoff retry on transient errors."""
     import httpx as _httpx
+
     for attempt in range(MAX_RETRIES):
         try:
             await coro_fn()
@@ -41,79 +38,95 @@ async def _with_retry(coro_fn, job_id, job_type: str, poll_interval: float):
             return
 
 
-async def process_transcription_jobs(poll_interval: float = 5.0):
-    """Process pending transcription jobs."""
+async def process_transcription_jobs(poll_interval: float = 5.0, concurrency: int = 1) -> int:
+    """Claim and process pending transcription jobs."""
     db = SessionLocal()
     try:
-        jobs = transcription.get_pending_jobs(db, limit=1)
-        for job in jobs:
-            logger.info("Processing transcription job: %s", job.id)
-            await _with_retry(
-                lambda: transcription.process_transcription_job(db, job),
-                job.id,
-                "transcription",
-                poll_interval,
-            )
+        job_ids = transcription.claim_pending_jobs(db, limit=concurrency)
     except Exception as e:
-        logger.error("Error fetching transcription jobs: %s", e)
+        logger.error("Error claiming transcription jobs: %s", e)
+        return 0
     finally:
         db.close()
 
+    if not job_ids:
+        return 0
 
-async def process_summary_jobs(poll_interval: float = 5.0):
-    """Process pending summary jobs."""
+    async def _run(job_id):
+        logger.info("Processing transcription job: %s", job_id)
+        await _with_retry(
+            lambda: transcription.process_transcription_job_by_id(job_id),
+            job_id,
+            "transcription",
+            poll_interval,
+        )
+
+    await asyncio.gather(*[_run(job_id) for job_id in job_ids])
+    return len(job_ids)
+
+
+async def process_summary_jobs(poll_interval: float = 5.0, concurrency: int = 1) -> int:
+    """Claim and process pending summary jobs."""
     db = SessionLocal()
     try:
-        summaries = summarization.get_pending_summaries(db, limit=1)
-        for summary in summaries:
-            logger.info("Processing summary: %s", summary.id)
-            await _with_retry(
-                lambda: summarization.process_summary(db, summary),
-                summary.id,
-                "summary",
-                poll_interval,
-            )
+        summary_ids = summarization.claim_pending_summaries(db, limit=concurrency)
     except Exception as e:
-        logger.error("Error fetching summary jobs: %s", e)
+        logger.error("Error claiming summary jobs: %s", e)
+        return 0
     finally:
         db.close()
 
+    if not summary_ids:
+        return 0
 
-async def worker_loop(poll_interval: float = 5.0):
-    """
-    Main worker loop that processes jobs continuously.
+    async def _run(summary_id):
+        logger.info("Processing summary: %s", summary_id)
+        await _with_retry(
+            lambda: summarization.process_summary_by_id(summary_id),
+            summary_id,
+            "summary",
+            poll_interval,
+        )
 
-    Args:
-        poll_interval: Seconds to wait between checks for new jobs
-    """
+    await asyncio.gather(*[_run(summary_id) for summary_id in summary_ids])
+    return len(summary_ids)
+
+
+async def worker_loop(poll_interval: float | None = None):
+    """Main worker loop that processes jobs continuously."""
     global _running, _cleanup_counter
     _running = True
     _cleanup_counter = 0
 
-    logger.info("Worker started")
+    poll_interval = poll_interval or settings.worker_poll_interval
+    transcription_concurrency = max(1, settings.worker_transcription_concurrency)
+    summary_concurrency = max(1, settings.worker_summary_concurrency)
+
+    logger.info(
+        "Worker started (poll_interval=%.1fs, transcription_concurrency=%d, summary_concurrency=%d)",
+        poll_interval,
+        transcription_concurrency,
+        summary_concurrency,
+    )
 
     while _running:
         try:
-            # Process one transcription job
-            await process_transcription_jobs(poll_interval)
+            transcription_count = await process_transcription_jobs(poll_interval, transcription_concurrency)
+            summary_count = await process_summary_jobs(poll_interval, summary_concurrency)
 
-            # Process one summary job
-            await process_summary_jobs(poll_interval)
-
-            # Run cleanup periodically
             _cleanup_counter += 1
             if _cleanup_counter >= CLEANUP_INTERVAL:
                 _cleanup_counter = 0
                 await cleanup.run_cleanup_job()
 
-            # Wait before next poll
-            await asyncio.sleep(poll_interval)
+            if transcription_count == 0 and summary_count == 0:
+                await asyncio.sleep(poll_interval)
 
         except asyncio.CancelledError:
             logger.info("Worker cancelled")
             break
         except Exception as e:
-            logger.error(f"Worker error: {e}")
+            logger.error("Worker error: %s", e)
             await asyncio.sleep(poll_interval)
 
     logger.info("Worker stopped")

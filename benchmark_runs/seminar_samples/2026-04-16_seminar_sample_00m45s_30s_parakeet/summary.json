@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 1.9926421819254756,
+    "real_time_factor": 0.06642140606418252,
+    "x_realtime": 15.05538740076817,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-qxausy2h/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 1.9292103736661375,
+        "text": "結構、たたかせてもらってるで、あれ。クロード以外にも使えますもんね、あれそうね、いや、今、そう、クロードコードでやってて、なんか、木村先生もなんか、結局、ソーシャルデータサイエンス研究所の中でやっぱり作りたいって、レコード聴くのも含めてっていう話で、なんかあれやね、角野さんがやってくれたんかもしれんけど。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 9706,
+    "gpu_memory_after_run_mb": 7442,
+    "torch_peak_reserved_mb": 4988
+  }
+]

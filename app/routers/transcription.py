@@ -39,6 +39,7 @@ def _upload_page_context(
         "engines": TranscriptionEngine,
         "error": error,
         "max_upload_size_mb": _max_upload_size_mb(),
+        "default_engine": settings.default_transcription_engine,
     }
 
 
@@ -114,7 +115,7 @@ async def upload_file(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     file: Annotated[UploadFile, File()],
-    engine: Annotated[str, Form()] = "faster_whisper",
+    engine: Annotated[str, Form()] = settings.default_transcription_engine,
     model_size: Annotated[str, Form()] = "medium",
     language: Annotated[str | None, Form()] = None,
     csrf_token: Annotated[str, Form()] = "",
@@ -182,13 +183,17 @@ async def upload_file(
     try:
         transcription_engine = TranscriptionEngine(engine)
     except ValueError:
-        transcription_engine = TranscriptionEngine.FASTER_WHISPER
+        transcription_engine = TranscriptionEngine(settings.default_transcription_engine)
+
+    effective_model_size = model_size
+    if transcription_engine == TranscriptionEngine.PARAKEET_JA:
+        effective_model_size = "parakeet-tdt_ctc-0.6b-ja"
 
     job = TranscriptionJob(
         audio_file_id=audio_file.id,
         user_id=current_user.id,
         engine=transcription_engine,
-        model_size=model_size,
+        model_size=effective_model_size,
         language=language if language else None,
     )
     db.add(job)

@@ -29,6 +29,7 @@ class TranscriptionEngine(str, enum.Enum):
     WHISPER = "whisper"
     FASTER_WHISPER = "faster_whisper"
     QWEN_ASR = "qwen_asr"
+    PARAKEET_JA = "parakeet_ja"
 
 
 class TranscriptionJob(Base):
@@ -47,9 +48,11 @@ class TranscriptionJob(Base):
         Enum(TranscriptionStatus), default=TranscriptionStatus.PENDING, nullable=False
     )
     engine: Mapped[TranscriptionEngine] = mapped_column(
-        Enum(TranscriptionEngine), default=TranscriptionEngine.FASTER_WHISPER, nullable=False
+        Enum(TranscriptionEngine), default=TranscriptionEngine.PARAKEET_JA, nullable=False
     )
-    model_size: Mapped[str] = mapped_column(String(50), default="medium", nullable=False)
+    model_size: Mapped[str] = mapped_column(
+        String(50), default="parakeet-tdt_ctc-0.6b-ja", nullable=False
+    )
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)  # None = auto-detect
 
     # Results

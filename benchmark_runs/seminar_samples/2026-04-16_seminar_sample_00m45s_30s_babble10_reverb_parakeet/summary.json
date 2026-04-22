@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.9846539949066937,
+    "real_time_factor": 0.032821799830223125,
+    "x_realtime": 30.467555258172506,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-fci8uox4/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.8530468749813735,
+        "text": "都市はモロッコのスルタンによって再建されています。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 7723,
+    "gpu_memory_after_run_mb": 5459,
+    "torch_peak_reserved_mb": 4988
+  }
+]

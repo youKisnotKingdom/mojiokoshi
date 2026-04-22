@@ -1,0 +1,14 @@
+{
+  "tag": "stale-job-test-20260422",
+  "job_id": "1ef78898-06b4-44e1-a63c-a141be2e1bb5",
+  "first_claim": [
+    "1ef78898-06b4-44e1-a63c-a141be2e1bb5"
+  ],
+  "second_claim_after_simulated_crash": [],
+  "job_status_after_abandon": "processing",
+  "started_at_after_abandon": "2026-04-22T10:18:14.741411+00:00",
+  "summary": {
+    "stuck_processing": true,
+    "reclaimable_without_manual_reset": false
+  }
+}

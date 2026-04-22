@@ -1,0 +1,29 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 28.2,
+    "total_wall_s": 0.7570856027305126,
+    "real_time_factor": 0.02684700718902527,
+    "x_realtime": 37.24809968422804,
+    "reference_metrics": {
+      "cer": 0.050505050505050504,
+      "wer": 1.0,
+      "method": "rapidfuzz"
+    },
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-c48h3xmc/chunks/chunk_0000.wav",
+        "audio_duration_s": 28.2,
+        "wall_time_s": 0.6990865631960332,
+        "text": "ペリー氏はテキサスに戻って、今夜のコーカスの結果を見極めし、この選挙戦で自分が進むべき道があるかどうかを判断すると述べましたが、後に選挙戦に残り、1月21日のサウスカロライナ州の予備選に出馬すると述べました。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 7723,
+    "gpu_memory_after_run_mb": 5459,
+    "torch_peak_reserved_mb": 4988
+  }
+]

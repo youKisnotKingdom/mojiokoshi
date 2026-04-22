@@ -4,9 +4,10 @@ Audio transcription and summarization web application for on-premises deployment
 
 ## Features
 
-- Browser-based audio recording with real-time transcription
+- File upload transcription as the primary production path
+- Optional browser recording with real-time transcription (feature flag)
 - File upload support (MP3, WAV, M4A, FLAC, OGG, WebM, etc.)
-- Streaming transcription using Whisper/faster-whisper
+- Batch transcription using Parakeet JA by default with faster-whisper fallback
 - LLM-powered summarization via local OpenAI-compatible API
 - Multi-user support with admin/user roles
 - Automatic audio file cleanup
@@ -16,8 +17,8 @@ Audio transcription and summarization web application for on-premises deployment
 - **Backend**: FastAPI (Python)
 - **Frontend**: HTMX + Jinja2 + Tailwind CSS
 - **Database**: PostgreSQL
-- **Task Queue**: Celery + Redis
-- **Transcription**: Whisper / faster-whisper (GPU)
+- **Background Worker**: In-process polling worker
+- **Transcription**: Parakeet JA (NeMo) / faster-whisper fallback
 - **Summarization**: Local LLM server (vLLM, Ollama, etc.)
 
 ## Development Setup
@@ -116,9 +117,13 @@ ALLOWED_HOSTS=localhost,127.0.0.1,<server-ip>
 LLM_API_BASE_URL=http://<llm-server-ip>:8080/v1
 LLM_MODEL_NAME=your-model-name
 
-# Whisper settings
-WHISPER_MODEL_SIZE=large
-WHISPER_DEVICE=cuda  # or 'cpu' for CPU-only
+# Batch transcription defaults
+DEFAULT_TRANSCRIPTION_ENGINE=parakeet_ja
+WORKER_WHISPER_DEVICE=cuda
+ENABLE_REALTIME_TRANSCRIPTION=false
+
+# Optional fallback/checker settings
+WHISPER_MODEL_SIZE=medium
 ```
 
 3. Build and start:
@@ -145,13 +150,19 @@ For NVIDIA GPU support, ensure you have:
 
 The deployment includes:
 - **web**: Main web application (FastAPI) — `http://<server-ip>:8000`
-- **worker**: Background worker for transcription and summarization
+- **worker**: Background worker for batch transcription and summarization
 - **db**: PostgreSQL database
 - **checker**: Real-time transcription checker demo — `http://<server-ip>:8001`
 
 With HTTPS overlay (`docker-compose.https.yml`):
 - Main app: https://\<server-ip\> (port 443)
 - Checker demo: https://\<server-ip\>:8444 (HTTPS required for microphone access)
+
+Production defaults:
+- Batch transcription runs on the `worker` container with `Parakeet JA`
+- `web` stays on CPU by default so batch and UI do not compete for GPU
+- Real-time recording UI is disabled by default with `ENABLE_REALTIME_TRANSCRIPTION=false`
+- The checker demo is optional and should stay on CPU unless you are explicitly testing it
 
 ### Configuration
 
@@ -162,8 +173,14 @@ With HTTPS overlay (`docker-compose.https.yml`):
 | `DATABASE_URL` | - | PostgreSQL connection URL |
 | `LLM_API_BASE_URL` | - | Local LLM server URL |
 | `LLM_MODEL_NAME` | default | Model name for summarization |
-| `WHISPER_MODEL_SIZE` | large | Whisper model (tiny/base/small/medium/large) |
-| `WHISPER_DEVICE` | cpu | Device for Whisper (cuda/cpu) |
+| `DEFAULT_TRANSCRIPTION_ENGINE` | parakeet_ja | Default batch transcription engine |
+| `WHISPER_MODEL_SIZE` | medium | faster-whisper fallback / checker model size |
+| `WEB_WHISPER_DEVICE` | cpu | Device used by `web` in Docker |
+| `WORKER_WHISPER_DEVICE` | cuda | Device used by batch worker in Docker |
+| `CHECKER_WHISPER_DEVICE` | cpu | Device used by checker demo in Docker |
+| `ENABLE_REALTIME_TRANSCRIPTION` | false | Show browser recording UI |
+| `WORKER_TRANSCRIPTION_CONCURRENCY` | 1 | Claimed transcription jobs per worker process |
+| `WORKER_SUMMARY_CONCURRENCY` | 1 | Claimed summary jobs per worker process |
 | `AUDIO_RETENTION_DAYS` | 30 | Days to keep audio files |
 | `MAX_UPLOAD_SIZE` | 1073741824 | Max upload size in bytes (Docker default: 1GB) |
 | `NGINX_CLIENT_MAX_BODY_SIZE` | 1g | nginx upload limit for HTTPS overlay |
@@ -208,6 +225,12 @@ Notes:
 - With the current benchmarked models and chunked inference (`120s` or `300s` chunks), a `16GB` GPU is sufficient for `1GB` to `2GB` class uploads. The bottleneck is upload size, wall-clock time, and disk usage rather than VRAM.
 - In practice, `1GB` is enough for roughly `18 hours` of `128kbps` MP3/M4A or `9 hours` of `16kHz mono WAV`.
 - `2GB` is reasonable if you want to accept multi-hour WAV without re-encoding, but beyond that the web upload path becomes the bigger operational risk.
+
+### Runtime Notes
+
+- The current app runtime does **not** use vLLM request batching for transcription.
+- Batch jobs are claimed from PostgreSQL by the worker process and executed one job at a time per worker process.
+- Real-time recording remains a separate, optional path and is disabled by default in production.
 
 ### ASR 検証用モデル
 

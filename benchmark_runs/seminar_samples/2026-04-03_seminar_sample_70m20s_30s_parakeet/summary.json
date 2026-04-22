@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.846125019248575,
+    "real_time_factor": 0.028204167308285833,
+    "x_realtime": 35.45575336685155,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-r98mwlkt/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.8150112880393863,
+        "text": "やらなきゃいけないでこれにちょっとここに近いんですけどあとはその純粋にお金の話で研究するためのっていうところで一つはさっき言ってた黒潤の競争の場なんですけどこれはまた桜井さんにしゃべってもらったら競争の場全体それでいいんじゃないかなと思うんだけどちょっと待って下さい。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 12914,
+    "gpu_memory_after_run_mb": 10650,
+    "torch_peak_reserved_mb": 4988
+  }
+]

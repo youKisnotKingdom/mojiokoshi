@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "cohere_transcribe",
+    "repo_id": "CohereLabs/cohere-transcribe-03-2026",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.6178711233660579,
+    "real_time_factor": 0.020595704112201928,
+    "x_realtime": 48.553814647567684,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-uz_46l9q/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.5883302339352667,
+        "text": "結構、戦してもらってるよね。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 7171,
+    "gpu_memory_after_run_mb": 7381,
+    "torch_peak_reserved_mb": 4468
+  }
+]

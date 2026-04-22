@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     ffmpeg \
     libsndfile1 \
+    sox \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,7 +39,8 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install Python dependencies (includes faster-whisper)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir numpy typing_extensions \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app ./app

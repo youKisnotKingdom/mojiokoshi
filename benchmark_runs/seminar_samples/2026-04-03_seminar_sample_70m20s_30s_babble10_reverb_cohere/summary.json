@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "cohere_transcribe",
+    "repo_id": "CohereLabs/cohere-transcribe-03-2026",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.6762941349297762,
+    "real_time_factor": 0.02254313783099254,
+    "x_realtime": 44.3593969702474,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-h8q8l45m/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.6470985841006041,
+        "text": "で、これにちょっと、まあ、ここに近いんですけど、あとは、お金の話で、きっと、協力するためによって、カサブランカと名付けられました。一つはさっき言ってた黒人の競争の場なんですけど、これはまた櫻井さんにしゃべってもらったら、競争の場全体。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 7171,
+    "gpu_memory_after_run_mb": 7381,
+    "torch_peak_reserved_mb": 4468
+  }
+]

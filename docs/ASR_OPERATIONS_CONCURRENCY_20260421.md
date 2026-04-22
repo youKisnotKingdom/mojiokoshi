@@ -1,22 +1,29 @@
 # ASR Operations Concurrency Report
 
+現行 worker の実測を含む最新版は [ASR_OPERATIONS_RUNTIME_20260422.md](/home/ykadono/dev/mojiokoshi/docs/ASR_OPERATIONS_RUNTIME_20260422.md:1) を参照してください。
+
 更新日: 2026-04-21
 
 このレポートは、ベンチマーク実測の `xRealtime` を使って、同時アクセス時の待ち時間を概算したものです。
 現在の実装は worker 1 本前提なので、`current_single_worker` が現実の挙動に近いです。
 `recommended_parallel` は `SKIP LOCKED` 導入後の仮説値です。
 
+現行デプロイの cold start / warm state 実測は
+[ASR_OPERATIONS_RUNTIME_20260422.md](/home/ykadono/dev/mojiokoshi/docs/ASR_OPERATIONS_RUNTIME_20260422.md:1)
+を参照してください。
+
 ## 実装の前提
 
-- 現在の本番文字起こし経路は `app/services/transcription.py` の `faster-whisper` 実装のみです。
-- `job.engine` は保存されますが、worker 実行時に Qwen や vLLM へ分岐していません。
+- 現在の本番文字起こし経路は `Parakeet JA` が既定で、`faster-whisper` は fallback として残っています。
+- `job.engine` は保存されますが、現行 production worker は `Parakeet JA` と `faster-whisper` のみをサポートします。
+- `Cohere` / `Qwen` / `vLLM` は比較検証用であり、現行アプリ本体の batch 経路には入っていません。
 - `vLLM` はベンチ用 `qwen-asr[vllm]` スクリプトでのみ使っていて、アプリ本体の並列推論には入っていません。
 - そのため、現状のアプリには vLLM の request batching / continuous batching はありません。
 
 ## Parakeet
 
 - xRealtime: `144.16x`
-- 補足: 精度優先。16GB GPU では 1 worker 想定。
+- 補足: 現行 batch 既定エンジン。16GB GPU では 1 worker 想定。
 
 | シナリオ | 現行: 平均待ち時間 | 現行: 全件完了 | 仮説: worker数 | 仮説: 平均待ち時間 | 仮説: 全件完了 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -28,7 +35,7 @@
 ## Cohere
 
 - xRealtime: `169.80x`
-- 補足: 速いが現状は 1 worker 想定。
+- 補足: 速い代替候補。現行 app runtime には未統合。
 
 | シナリオ | 現行: 平均待ち時間 | 現行: 全件完了 | 仮説: worker数 | 仮説: 平均待ち時間 | 仮説: 全件完了 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -40,7 +47,7 @@
 ## Reazon Zipformer
 
 - xRealtime: `286.13x`
-- 補足: 低VRAM。SKIP LOCKED 導入後なら 2 worker 候補。
+- 補足: 低VRAM。app runtime には未統合。SKIP LOCKED 導入後なら 2 worker 候補。
 
 | シナリオ | 現行: 平均待ち時間 | 現行: 全件完了 | 仮説: worker数 | 仮説: 平均待ち時間 | 仮説: 全件完了 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -52,7 +59,7 @@
 ## Reazon NeMo v2
 
 - xRealtime: `40.62x`
-- 補足: 長尺候補だが VRAM と速度の両面から 1 worker 想定。
+- 補足: 長尺候補だが app runtime には未統合。VRAM と速度の両面から 1 worker 想定。
 
 | シナリオ | 現行: 平均待ち時間 | 現行: 全件完了 | 仮説: worker数 | 仮説: 平均待ち時間 | 仮説: 全件完了 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -64,7 +71,7 @@
 ## faster-whisper
 
 - xRealtime: `19.43x`
-- 補足: 保守的な代替。専用 GPU 前提で 2 worker 候補。
+- 補足: fallback engine。専用 GPU 前提で 2 worker 候補。
 
 | シナリオ | 現行: 平均待ち時間 | 現行: 全件完了 | 仮説: worker数 | 仮説: 平均待ち時間 | 仮説: 全件完了 |
 | --- | ---: | ---: | ---: | ---: | ---: |

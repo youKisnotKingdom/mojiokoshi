@@ -1,0 +1,21 @@
+{
+  "tag": "queue-claim-test-20260421",
+  "job_ids": [
+    "5a00e3c0-7b8e-427b-9da8-b018439d1a0a",
+    "6209f18f-6916-417b-8d49-d2e7b969cb20"
+  ],
+  "plain_select": {
+    "worker1": "5a00e3c0-7b8e-427b-9da8-b018439d1a0a",
+    "worker2": "5a00e3c0-7b8e-427b-9da8-b018439d1a0a",
+    "duplicate": true
+  },
+  "for_update_skip_locked": {
+    "worker1": "5a00e3c0-7b8e-427b-9da8-b018439d1a0a",
+    "worker2": "6209f18f-6916-417b-8d49-d2e7b969cb20",
+    "duplicate": false
+  },
+  "summary": {
+    "plain_duplicates": true,
+    "skip_locked_duplicates": false
+  }
+}

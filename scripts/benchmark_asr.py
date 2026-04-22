@@ -348,6 +348,8 @@ def build_adapter(
     faster_whisper_size: str,
     family: str | None = None,
     language: str | None = None,
+    parakeet_boost_phrases_file: Path | None = None,
+    parakeet_boost_alpha: float = 0.0,
 ):
     if model_alias == "faster_whisper":
         return FasterWhisperAdapter(faster_whisper_size, device)
@@ -365,7 +367,13 @@ def build_adapter(
     if family == "nemo-rnnt" or model_alias == "reazon_nemo_v2":
         return ReazonNemoAdapter(repo_id, device)
     if model_alias == "parakeet_ja":
-        return ParakeetAdapter(repo_id, device)
+        return ParakeetAdapter(
+            repo_id,
+            device,
+            boost_phrases_file=parakeet_boost_phrases_file,
+            boost_alpha=parakeet_boost_alpha,
+            language=language,
+        )
     if family == "canary" or model_alias == "canary_1b_flash":
         source_lang = (language or "ja").split("-")[0]
         if source_lang not in CanaryAdapter.SUPPORTED_LANGS:
@@ -526,7 +534,14 @@ class ReazonNemoAdapter:
 
 
 class ParakeetAdapter:
-    def __init__(self, repo_id: str, device: str) -> None:
+    def __init__(
+        self,
+        repo_id: str,
+        device: str,
+        boost_phrases_file: Path | None = None,
+        boost_alpha: float = 0.0,
+        language: str | None = None,
+    ) -> None:
         try:
             import nemo.collections.asr as nemo_asr
         except ImportError as exc:
@@ -535,6 +550,19 @@ class ParakeetAdapter:
             ) from exc
 
         self.model = nemo_asr.models.ASRModel.from_pretrained(model_name=repo_id)
+
+        if boost_phrases_file and boost_alpha > 0:
+            from omegaconf import open_dict
+
+            decode_cfg = self.model.cfg.decoding
+            with open_dict(decode_cfg.greedy):
+                decode_cfg.greedy.boosting_tree = {
+                    "key_phrases_file": str(boost_phrases_file),
+                    "source_lang": (language or "ja").split("-")[0],
+                }
+                decode_cfg.greedy.boosting_tree_alpha = boost_alpha
+            self.model.change_decoding_strategy(decode_cfg)
+
         if device.startswith("cuda"):
             self.model = self.model.cuda()
 
@@ -698,6 +726,18 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="正解テキスト。指定すると CER/WER を計算",
     )
+    parser.add_argument(
+        "--parakeet-boost-phrases-file",
+        type=Path,
+        default=None,
+        help="Parakeet 用の phrase list。1 行 1 phrase。",
+    )
+    parser.add_argument(
+        "--parakeet-boost-alpha",
+        type=float,
+        default=0.0,
+        help="Parakeet の boosting tree alpha。0 なら無効。",
+    )
     return parser.parse_args()
 
 
@@ -741,6 +781,8 @@ def main() -> None:
                 faster_whisper_size=args.faster_whisper_size,
                 family=model.get("family"),
                 language=args.language or None,
+                parakeet_boost_phrases_file=args.parakeet_boost_phrases_file,
+                parakeet_boost_alpha=args.parakeet_boost_alpha,
             )
             model_output_dir = output_root / model["alias"]
             device_index = parse_cuda_device_index(device)

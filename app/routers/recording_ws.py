@@ -328,8 +328,12 @@ async def finalize_recording(
     job = TranscriptionJob(
         audio_file_id=audio_file.id,
         user_id=user.id,
-        engine=TranscriptionEngine.FASTER_WHISPER,
-        model_size="medium",
+        engine=TranscriptionEngine(settings.default_transcription_engine),
+        model_size=(
+            "parakeet-tdt_ctc-0.6b-ja"
+            if settings.default_transcription_engine == TranscriptionEngine.PARAKEET_JA.value
+            else settings.whisper_model_size
+        ),
     )
     db.add(job)
     db.commit()

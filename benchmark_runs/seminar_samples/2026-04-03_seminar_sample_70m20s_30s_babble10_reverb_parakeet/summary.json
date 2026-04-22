@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 1.027273726183921,
+    "real_time_factor": 0.03424245753946404,
+    "x_realtime": 29.20351142576468,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-w52d342_/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.9109107530675828,
+        "text": "やらなきゃいけないこれにちょっとここに近いんですけどあとは要するにお金の話で研究するためのっていうところで一つはさっき言ってた黒需要の競争の場なんですけどこれはまたサボライさんにしゃべってもらったら都市はモロッコのスルタンによってダルルバリアとして再建されました。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 7723,
+    "gpu_memory_after_run_mb": 5459,
+    "torch_peak_reserved_mb": 4988
+  }
+]

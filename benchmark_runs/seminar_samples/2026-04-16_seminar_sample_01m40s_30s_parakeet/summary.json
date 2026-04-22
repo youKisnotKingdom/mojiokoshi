@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.8217436647973955,
+    "real_time_factor": 0.027391455493246515,
+    "x_realtime": 36.507735057983844,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-6eggfgqw/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.7169361510314047,
+        "text": "だって、あのローカルのipで、ブリッジみたいになってるって感じやんねそうですね、たぶん、ローカル見に行けるんで、あそこ、だったら。それはそれでいいんかっていう議論はあんねんけど、患者のデータというか、なんか検査のデータとかで上げていいの?っていうのが、1週間、30、90ほど、そうですね、いや、2ないなんで。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 7723,
+    "gpu_memory_after_run_mb": 5459,
+    "torch_peak_reserved_mb": 4988
+  }
+]

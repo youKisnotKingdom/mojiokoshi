@@ -1,0 +1,48 @@
+[
+  {
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.7464164267294109,
+    "real_time_factor": 0.02488054755764703,
+    "x_realtime": 40.192041500816984,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-pvo67z0q/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.6023799730464816,
+        "text": "昔はこんな感じで。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 7723,
+    "gpu_memory_after_run_mb": 5459,
+    "torch_peak_reserved_mb": 4988
+  },
+  {
+    "model_alias": "cohere_transcribe",
+    "repo_id": "CohereLabs/cohere-transcribe-03-2026",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 0.4776348788291216,
+    "real_time_factor": 0.015921162627637386,
+    "x_realtime": 62.80948341449073,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-pvo67z0q/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 0.33660954888910055,
+        "text": "うんうんそこに何かしらこんな感じです。"
+      }
+    ],
+    "gpu_memory_after_load_mb": 9403,
+    "gpu_memory_after_run_mb": 9537,
+    "torch_peak_reserved_mb": 6594
+  }
+]

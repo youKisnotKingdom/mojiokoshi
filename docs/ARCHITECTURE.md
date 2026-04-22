@@ -42,7 +42,8 @@ FastAPIベースのWebアプリケーション
 | `/` | ホーム画面 |
 | `/auth/*` | ログイン・ログアウト |
 | `/transcription/*` | 文字起こし（アップロード・録音） |
-| `/history` | 履歴一覧 |
+| `/history/uploads` | アップロード履歴 |
+| `/history/recordings` | 録音履歴 |
 | `/summary/*` | 要約機能 |
 | `/admin/users/*` | ユーザー管理（管理者のみ） |
 | `/ws/recording/{session_id}` | 録音WebSocket |
@@ -54,12 +55,16 @@ FastAPIベースのWebアプリケーション
 ┌─────────────────────────────────────────────┐
 │              Worker Loop (5秒間隔)           │
 │                                             │
-│  1. 文字起こしジョブをチェック → 処理         │
-│  2. 要約ジョブをチェック → 処理              │
+│  1. 文字起こしジョブを claim → 処理          │
+│  2. 要約ジョブを claim → 処理               │
 │  3. 1時間ごとにクリーンアップ実行            │
 │                                             │
 └─────────────────────────────────────────────┘
 ```
+
+補足:
+- claim には `FOR UPDATE SKIP LOCKED` を使い、複数 worker 化に備えています
+- ただし 1 process 内の文字起こしは同期実行なので、同一 worker 内の並列度は限定的です
 
 ### 3. データモデル
 
@@ -78,7 +83,7 @@ AudioFile (音声ファイル)
 
 TranscriptionJob (文字起こしジョブ)
 ├── status: pending → processing → completed/failed
-├── engine: faster_whisper / whisper / qwen_asr
+├── engine: parakeet_ja / faster_whisper / whisper / qwen_asr
 ├── result_text: 文字起こし結果
 └── result_segments: セグメント情報（JSON）
 
@@ -97,9 +102,9 @@ Summary (要約)
    ↓
 2. Web Server: ファイル保存 + AudioFile + TranscriptionJob作成
    ↓
-3. Worker: pending状態のジョブを検出
+3. Worker: pending状態のジョブを安全にclaim
    ↓
-4. Worker: faster-whisperで文字起こし実行
+4. Worker: Parakeet JAで文字起こし実行（fallbackでfaster-whisper）
    ↓
 5. Worker: 結果をDBに保存、status=completed
    ↓
@@ -113,7 +118,7 @@ Summary (要約)
    ↓
 2. Browser: MediaRecorder APIで録音開始
    ↓
-3. Browser: 30秒ごとにチャンクをWebSocket経由で送信
+3. Browser: 10秒ごとにチャンクをWebSocket経由で送信
    ↓
 4. Web Server: チャンクを一時保存
    ↓
@@ -158,7 +163,8 @@ Worker: 1時間ごとに実行
 | フロントエンド | HTMX + Jinja2 + Tailwind CSS |
 | バックエンド | FastAPI (Python 3.11) |
 | データベース | PostgreSQL 15 |
-| 文字起こし | faster-whisper (GPU/CUDA) |
+| バックグラウンド処理 | in-process polling worker |
+| 文字起こし | Parakeet JA (NeMo) / faster-whisper fallback |
 | 要約 | OpenAI互換API (vLLM/Ollama/llama.cpp) |
 | コンテナ | Docker + Docker Compose |
 
@@ -170,8 +176,12 @@ Worker: 1時間ごとに実行
 | `DATABASE_URL` | PostgreSQL接続URL | - |
 | `LLM_API_BASE_URL` | LLMサーバーURL | - |
 | `LLM_MODEL_NAME` | 使用モデル名 | default |
-| `WHISPER_MODEL_SIZE` | Whisperモデルサイズ | large |
-| `WHISPER_DEVICE` | 実行デバイス | cuda |
+| `DEFAULT_TRANSCRIPTION_ENGINE` | 既定のbatch文字起こしエンジン | parakeet_ja |
+| `WHISPER_MODEL_SIZE` | faster-whisper fallback / checker用モデルサイズ | medium |
+| `WHISPER_DEVICE` | 直接起動時の実行デバイス | cpu |
+| `ENABLE_REALTIME_TRANSCRIPTION` | 録音UIの表示可否 | true |
+| `WORKER_TRANSCRIPTION_CONCURRENCY` | 1 workerがclaimする文字起こしジョブ数 | 1 |
+| `WORKER_SUMMARY_CONCURRENCY` | 1 workerがclaimする要約ジョブ数 | 1 |
 | `AUDIO_RETENTION_DAYS` | 音声保持日数 | 30 |
 
 ## ディレクトリ構造
@@ -222,9 +232,9 @@ mojiokoshi/
 |------------|----------|------|
 | Python | 3.11+ | バックエンド |
 | Node.js | 18+ | Tailwind CSSビルド |
-| Docker | 20+ | PostgreSQL/Redis起動 |
+| Docker | 20+ | PostgreSQL/各サービス起動 |
 | NVIDIA Driver | 535+ | GPU文字起こし（オプション） |
-| CUDA | 12.0+ | faster-whisper用（オプション） |
+| CUDA | 12.0+ | Parakeet / faster-whisper 用（オプション） |
 
 ### 初回セットアップ手順
 
@@ -240,7 +250,6 @@ source .venv/bin/activate  # Linux/Mac
 
 # 3. Python依存関係をインストール
 pip install -r requirements.txt
-pip install faster-whisper  # GPU使用時
 
 # 4. Node依存関係をインストール
 npm install
@@ -305,16 +314,15 @@ docker-compose up -d
 │  1. PostgreSQL起動                                            │
 │     └─ ヘルスチェック: pg_isready                              │
 │                                                               │
-│  2. Redis起動                                                 │
-│                                                               │
-│  3. Web/Worker起動 (PostgreSQL ready後)                       │
+│  2. Web/Worker/Checker起動 (PostgreSQL ready後)               │
 │     └─ entrypoint.sh実行                                      │
 │         ├─ データベース接続待機                                 │
-│         ├─ テーブル作成 (init_db.py)                           │
+│         ├─ マイグレーション実行                                │
 │         ├─ 管理者作成 (環境変数指定時)                          │
 │         └─ メインプロセス起動                                   │
 │            ├─ Web: uvicorn app.main:app                       │
-│            └─ Worker: python -m app.services.worker           │
+│            ├─ Worker: python -m app.services.worker           │
+│            └─ Checker: uvicorn demo.checker:app               │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -324,8 +332,8 @@ docker-compose up -d
 services:
   web:        # Webサーバー (ポート8000)
   worker:     # バックグラウンドワーカー (GPU使用)
+  checker:    # 文字起こしチェッカーデモ (通常はCPU推奨)
   db:         # PostgreSQL (内部ポート5432)
-  redis:      # Redis (内部ポート6379)
 ```
 
 ### 初回デプロイ手順
@@ -337,7 +345,9 @@ cp .env.example .env
 # 2. .envを編集
 #    - SECRET_KEY: 安全なランダム文字列
 #    - LLM_API_BASE_URL: LLMサーバーのURL
-#    - WHISPER_DEVICE: cuda または cpu
+#    - DEFAULT_TRANSCRIPTION_ENGINE: parakeet_ja
+#    - WORKER_WHISPER_DEVICE: cuda または cpu
+#    - ENABLE_REALTIME_TRANSCRIPTION: false（本番推奨）
 
 # 3. ビルド＆起動
 docker-compose up -d --build

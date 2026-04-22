@@ -122,7 +122,34 @@
 - `Cohere` は transcript の見た目が比較的安定
 - `Parakeet` は速度で劣るが、既存ベンチ全体では依然として本命
 
-## 6. 運用上の同時処理
+## 6. ノイズ耐性
+
+単発 28 秒サンプルだけでなく、`FLEURS ja` の 20 件サブセットでも `babble + reverb` をかけて再評価しました。
+
+条件:
+- `clean`
+- `babble10_reverb`
+  - 4 本の別話者音声を混ぜた `speech babble`
+  - `babble SNR = 10dB`
+  - OpenRIR `SLR26` の simulated RIR を適用
+
+| Model | Clean CER | Noisy CER | Delta |
+| --- | ---: | ---: | ---: |
+| `parakeet_ja` | `10.20%` | `22.11%` | `+11.90pt` |
+| `cohere_transcribe` | `13.78%` | `30.61%` | `+16.84pt` |
+| `faster_whisper` | `14.71%` | `29.51%` | `+14.80pt` |
+| `reazon_zipformer` | `14.03%` | `31.38%` | `+17.35pt` |
+
+所見:
+- `white noise` 単体より、`speech babble + reverb` の方がはっきり効きます。
+- 20 件 aggregate でも、ノイズ下の最良は `parakeet_ja` でした。
+- 単発サンプルでは `Cohere` がよく見える区間もありますが、aggregate の落ち幅は `Parakeet` より大きいです。
+
+詳細:
+- [noise robustness / FLEURS subset 20](/home/ykadono/dev/mojiokoshi/benchmark_runs/noise_robustness/fleurs_subset20/summary.md:1)
+- [noise robustness / single 28s sample](/home/ykadono/dev/mojiokoshi/benchmark_runs/noise_robustness/fleurs_28s/summary.md:1)
+
+## 7. 運用上の同時処理
 
 現状コードでは、`同時アップロード` はできても、`同時文字起こし実行` はほぼ想定されていません。
 
@@ -148,7 +175,7 @@
 2. 並列化するなら、先に `SKIP LOCKED` ベースの安全なワーカー取り出しへ変更
 3. その上でモデルごとに worker 数を分ける
 
-## 7. 参照
+## 8. 参照
 
 - 既存総合サマリ: [ASR_BENCHMARK_SUMMARY.md](./ASR_BENCHMARK_SUMMARY.md)
 - モデル一覧: [ASR_VALIDATION_MODELS.md](./ASR_VALIDATION_MODELS.md)

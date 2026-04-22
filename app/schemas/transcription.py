@@ -9,8 +9,8 @@ from app.schemas.audio import AudioFileResponse
 
 class TranscriptionJobCreate(BaseModel):
     audio_file_id: uuid.UUID
-    engine: TranscriptionEngine = TranscriptionEngine.FASTER_WHISPER
-    model_size: str = "medium"
+    engine: TranscriptionEngine = TranscriptionEngine.PARAKEET_JA
+    model_size: str = "parakeet-tdt_ctc-0.6b-ja"
     language: str | None = None
 
 

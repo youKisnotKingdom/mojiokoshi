@@ -198,6 +198,34 @@ seminar の実ファイル 2 本で文字起こしを回した結果です。gol
 - [/home/takemura-lab/Videos/seminar/runs/cohere_transcribe](/home/takemura-lab/Videos/seminar/runs/cohere_transcribe)
 - [/home/takemura-lab/Videos/seminar/runs/reazon_zipformer](/home/takemura-lab/Videos/seminar/runs/reazon_zipformer)
 
+## Noise Robustness
+
+単発 28 秒サンプルだけだと弱いので、`FLEURS ja` の 20 件サブセットでも `babble + reverb` をかけて再評価した。
+
+ノイズ条件:
+- `babble10_reverb`
+  - 4 本の別話者音声を混ぜた `speech babble`
+  - `babble SNR = 10dB`
+  - OpenRIR `SLR26` の simulated RIR を適用
+
+### FLEURS subset 20: clean vs babble+reverb
+
+| Model | Clean CER | Noisy CER | Delta |
+| --- | ---: | ---: | ---: |
+| `parakeet_ja` | `10.20%` | `22.11%` | `+11.90pt` |
+| `cohere_transcribe` | `13.78%` | `30.61%` | `+16.84pt` |
+| `faster_whisper` | `14.71%` | `29.51%` | `+14.80pt` |
+| `reazon_zipformer` | `14.03%` | `31.38%` | `+17.35pt` |
+
+結論:
+- `white noise` 単体より、`speech babble + reverb` の方がはっきり効く。
+- 20 件 aggregate でも、ノイズ下の最良は `parakeet_ja`。
+- `Cohere` は単発サンプルでは良く見える区間もあるが、aggregate では `Parakeet` より落ち幅が大きい。
+
+詳細:
+- [FLEURS subset 20 noise summary](/home/ykadono/dev/mojiokoshi/benchmark_runs/noise_robustness/fleurs_subset20/summary.md:1)
+- [28 秒単発の noise summary](/home/ykadono/dev/mojiokoshi/benchmark_runs/noise_robustness/fleurs_28s/summary.md:1)
+
 ## Qwen true streaming の現状
 
 `qwen-asr[vllm]` の true streaming は短いデータでは動いていますが、長尺 1 本をそのまま流す構成はまだ安定していません。

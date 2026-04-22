@@ -1,0 +1,25 @@
+[
+  {
+    "model_alias": "cohere_transcribe",
+    "repo_id": "CohereLabs/cohere-transcribe-03-2026",
+    "language": "ja",
+    "num_chunks": 1,
+    "total_audio_s": 30.0,
+    "total_wall_s": 1.457787374034524,
+    "real_time_factor": 0.04859291246781747,
+    "x_realtime": 20.57913282440703,
+    "reference_metrics": null,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "/tmp/asr-benchmark-niazndog/chunks/chunk_0000.wav",
+        "audio_duration_s": 30.0,
+        "wall_time_s": 1.4268797268159688,
+        "text": "あのでこれにちょっとまあここに近いんですけどあとはその純粋にお金の話で研究するためのっていうところであのまあ一つはさっき言ってた黒人の競争の場なんですけどこれはまた櫻井さんにしゃべってもらったら競争の場全体それでいいんじゃないかなと思うんだけどちょっと待ってください"
+      }
+    ],
+    "gpu_memory_after_load_mb": 12362,
+    "gpu_memory_after_run_mb": 12572,
+    "torch_peak_reserved_mb": 4468
+  }
+]

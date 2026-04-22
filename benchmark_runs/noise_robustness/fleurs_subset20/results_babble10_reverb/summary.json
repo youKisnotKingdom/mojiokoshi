@@ -1,0 +1,74 @@
+[
+  {
+    "dataset_name": "fleurs_subset20_babble10_reverb",
+    "model_alias": "parakeet_ja",
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "num_items": 20,
+    "total_audio_s": 292.98,
+    "total_wall_s": 1.806196328252554,
+    "real_time_factor": 0.006164913401094115,
+    "x_realtime": 162.20828013942995,
+    "reference_metrics": {
+      "cer": 0.22108843537414966,
+      "wer": 1.0,
+      "method": "rapidfuzz"
+    },
+    "gpu_memory_after_load_mb": 7723,
+    "gpu_memory_after_run_mb": 5593,
+    "torch_peak_reserved_mb": 4968
+  },
+  {
+    "dataset_name": "fleurs_subset20_babble10_reverb",
+    "model_alias": "cohere_transcribe",
+    "repo_id": "CohereLabs/cohere-transcribe-03-2026",
+    "num_items": 20,
+    "total_audio_s": 292.98,
+    "total_wall_s": 5.471000280231237,
+    "real_time_factor": 0.018673630555775946,
+    "x_realtime": 53.55145037346204,
+    "reference_metrics": {
+      "cer": 0.30612244897959184,
+      "wer": 1.0,
+      "method": "rapidfuzz"
+    },
+    "gpu_memory_after_load_mb": 9379,
+    "gpu_memory_after_run_mb": 9537,
+    "torch_peak_reserved_mb": 6594
+  },
+  {
+    "dataset_name": "fleurs_subset20_babble10_reverb",
+    "model_alias": "faster_whisper",
+    "repo_id": "medium",
+    "num_items": 20,
+    "total_audio_s": 292.98,
+    "total_wall_s": 15.486549021210521,
+    "real_time_factor": 0.05285872421738863,
+    "x_realtime": 18.918352926706387,
+    "reference_metrics": {
+      "cer": 0.2950680272108844,
+      "wer": 2.5,
+      "method": "rapidfuzz"
+    },
+    "gpu_memory_after_load_mb": 7363,
+    "gpu_memory_after_run_mb": 7409,
+    "torch_peak_reserved_mb": 2500
+  },
+  {
+    "dataset_name": "fleurs_subset20_babble10_reverb",
+    "model_alias": "reazon_zipformer",
+    "repo_id": "reazon-research/japanese-zipformer-base-k2-rs35kh",
+    "num_items": 20,
+    "total_audio_s": 292.98,
+    "total_wall_s": 1.3885189169086516,
+    "real_time_factor": 0.004739295914085096,
+    "x_realtime": 211.00180662448597,
+    "reference_metrics": {
+      "cer": 0.3137755102040816,
+      "wer": 1.0,
+      "method": "rapidfuzz"
+    },
+    "gpu_memory_after_load_mb": 3397,
+    "gpu_memory_after_run_mb": 3933,
+    "torch_peak_reserved_mb": 982
+  }
+]

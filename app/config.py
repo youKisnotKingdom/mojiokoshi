@@ -51,7 +51,11 @@ class Settings(BaseSettings):
     whisper_model_size: str = "medium"
     whisper_device: str = "cpu"
     whisper_language: str = "ja"
+    default_transcription_engine: str = "parakeet_ja"
     enable_realtime_transcription: bool = True
+    worker_poll_interval: float = 5.0
+    worker_transcription_concurrency: int = 1
+    worker_summary_concurrency: int = 1
 
 
 @lru_cache
