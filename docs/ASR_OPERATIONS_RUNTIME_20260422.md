@@ -297,5 +297,23 @@ job ごとの終了時刻:
 - queue の安全性は `SKIP LOCKED` で確保
 - worker crash 後の stuck job は timeout ベースで自動回収
 
+当面の固定値:
+
+```env
+DEFAULT_TRANSCRIPTION_ENGINE=parakeet_ja
+WORKER_TRANSCRIPTION_CONCURRENCY=1
+WORKER_SUMMARY_CONCURRENCY=1
+PARAKEET_CHUNK_SECONDS=300
+ENABLE_REALTIME_TRANSCRIPTION=false
+MAX_UPLOAD_SIZE=1073741824
+NGINX_CLIENT_MAX_BODY_SIZE=1g
+```
+
+運用ルール:
+- 通常運用は `worker=1`
+- queue が明確に伸びたときだけ `docker compose up -d --scale worker=2`
+- `worker=3` は `chunk=120秒` と GPU 専有が前提で、常用設定にはしない
+- `open-webui` など他の GPU 常駐サービスは同居させない
+
 次に優先すべきなのは **運用の見える化** です。  
 具体的には、queue の長さと待ち時間を UI や監視で見えるようにし、必要なら `worker=2` までを段階的に使うのがよいです。

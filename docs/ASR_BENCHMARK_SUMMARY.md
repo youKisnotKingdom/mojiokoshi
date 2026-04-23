@@ -1,6 +1,6 @@
 # ASR Benchmark Summary
 
-更新日: 2026-04-21
+更新日: 2026-04-23
 
 このファイルは、これまでに回した ASR ベンチマークの要点をためておくサマリです。
 生の結果は `benchmarks/**/report.json` にあります。
@@ -29,6 +29,7 @@
 - 基本構成: `worker=1`, `chunk=300秒`
 - 混雑時の上限: `worker=2`
 - 攻めた構成: `worker=3`, `chunk=120秒`, 他 GPU プロセス停止
+- `.env` の初期値としては `MAX_UPLOAD_SIZE=1073741824`, `NGINX_CLIENT_MAX_BODY_SIZE=1g`, `ENABLE_REALTIME_TRANSCRIPTION=false` を推奨
 
 chunk 長の目安:
 - `120秒`: worker 数を増やしやすいが、CER は `300秒` より少し落ちる

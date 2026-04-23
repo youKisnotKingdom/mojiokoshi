@@ -121,6 +121,9 @@ LLM_MODEL_NAME=your-model-name
 DEFAULT_TRANSCRIPTION_ENGINE=parakeet_ja
 WORKER_WHISPER_DEVICE=cuda
 ENABLE_REALTIME_TRANSCRIPTION=false
+PARAKEET_CHUNK_SECONDS=300
+MAX_UPLOAD_SIZE=1073741824
+NGINX_CLIENT_MAX_BODY_SIZE=1g
 
 # Optional fallback/checker settings
 WHISPER_MODEL_SIZE=medium
@@ -163,6 +166,12 @@ Production defaults:
 - `web` stays on CPU by default so batch and UI do not compete for GPU
 - Real-time recording UI is disabled by default with `ENABLE_REALTIME_TRANSCRIPTION=false`
 - The checker demo is optional and should stay on CPU unless you are explicitly testing it
+
+Recommended production profile:
+- Normal operation: `worker=1`, `PARAKEET_CHUNK_SECONDS=300`
+- Burst handling: scale to `worker=2` before changing chunk size
+- Do not treat `worker=3` as a normal setting on this `16GB` GPU
+- Keep other GPU-heavy services such as `open-webui` off the same host or stopped during batch-heavy periods
 
 ### Configuration
 
