@@ -18,7 +18,7 @@ from app.config import get_settings
 from app.database import SessionLocal
 from app.dependencies import get_current_user_optional, limiter
 from app.models.user import User
-from app.routers import auth, history, recording_ws, summary, transcription, users
+from app.routers import auth, history, operations, recording_ws, summary, transcription, users
 from app.templating import templates
 
 logger = logging.getLogger(__name__)
@@ -69,6 +69,7 @@ app.include_router(transcription.router)
 app.include_router(recording_ws.router)
 app.include_router(history.router)
 app.include_router(summary.router)
+app.include_router(operations.router)
 
 
 @app.get("/health")

@@ -20,6 +20,8 @@ services:
       - WHISPER_DEVICE=${WEB_WHISPER_DEVICE:-cpu}
       - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ja}
       - DEFAULT_TRANSCRIPTION_ENGINE=${DEFAULT_TRANSCRIPTION_ENGINE:-parakeet_ja}
+      - PARAKEET_CHUNK_SECONDS=${PARAKEET_CHUNK_SECONDS:-300}
+      - PARAKEET_SAMPLE_RATE=${PARAKEET_SAMPLE_RATE:-16000}
       - AUDIO_RETENTION_DAYS=${AUDIO_RETENTION_DAYS:-30}
       - ENABLE_REALTIME_TRANSCRIPTION=${ENABLE_REALTIME_TRANSCRIPTION:-false}
       - ADMIN_USER_ID=${ADMIN_USER_ID:-}
@@ -30,7 +32,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    gpus: all
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -42,7 +43,6 @@ services:
   worker:
     build: .
     image: mojiokoshi:latest
-    container_name: mojiokoshi-worker
     entrypoint: ["scripts/worker_entrypoint.sh"]
     command: python -m app.services.worker
     environment:
@@ -57,6 +57,8 @@ services:
       - WHISPER_DEVICE=${WORKER_WHISPER_DEVICE:-cuda}
       - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ja}
       - DEFAULT_TRANSCRIPTION_ENGINE=${DEFAULT_TRANSCRIPTION_ENGINE:-parakeet_ja}
+      - PARAKEET_CHUNK_SECONDS=${PARAKEET_CHUNK_SECONDS:-300}
+      - PARAKEET_SAMPLE_RATE=${PARAKEET_SAMPLE_RATE:-16000}
       - WORKER_POLL_INTERVAL=${WORKER_POLL_INTERVAL:-5}
       - WORKER_TRANSCRIPTION_CONCURRENCY=${WORKER_TRANSCRIPTION_CONCURRENCY:-1}
       - WORKER_SUMMARY_CONCURRENCY=${WORKER_SUMMARY_CONCURRENCY:-1}
@@ -96,7 +98,6 @@ services:
       - HF_HOME=/app/models
     volumes:
       - models:/app/models
-    gpus: all
     restart: unless-stopped
     logging:
       driver: "json-file"

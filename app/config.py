@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     whisper_device: str = "cpu"
     whisper_language: str = "ja"
     default_transcription_engine: str = "parakeet_ja"
+    parakeet_chunk_seconds: int = 300
+    parakeet_sample_rate: int = 16000
     enable_realtime_transcription: bool = True
     worker_poll_interval: float = 5.0
     worker_transcription_concurrency: int = 1

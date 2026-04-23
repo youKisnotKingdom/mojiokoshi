@@ -1,0 +1,48 @@
+{
+  "audio": "/app/uploads/ops-1hour-mono16.wav",
+  "jobs_requested": 4,
+  "poll_interval": 0.5,
+  "timeout": 600.0,
+  "elapsed_seconds": 34.677,
+  "timed_out": false,
+  "settings": {
+    "default_transcription_engine": "parakeet_ja",
+    "whisper_device": "cuda",
+    "engine": "parakeet_ja",
+    "model_size": "nvidia/parakeet-tdt_ctc-0.6b-ja"
+  },
+  "jobs": [
+    {
+      "job_id": "1ff1a063-af22-4eb7-86c7-e91d7b5b2c69",
+      "status": "completed",
+      "started_at": "2026-04-23T07:22:50.956270+00:00",
+      "completed_at": "2026-04-23T07:23:21.897264+00:00",
+      "error_message": null,
+      "result_text_length": 23094
+    },
+    {
+      "job_id": "485bfb47-f815-4191-956e-929052574085",
+      "status": "completed",
+      "started_at": "2026-04-23T07:22:51.657458+00:00",
+      "completed_at": "2026-04-23T07:23:22.519825+00:00",
+      "error_message": null,
+      "result_text_length": 23094
+    },
+    {
+      "job_id": "5abc09ba-209b-4c6b-aa3c-75ba4a0b0046",
+      "status": "failed",
+      "started_at": "2026-04-23T07:22:52.228441+00:00",
+      "completed_at": "2026-04-23T07:23:03.871917+00:00",
+      "error_message": "CUDA out of memory. Tried to allocate 16.00 MiB. GPU 0 has a total capacity of 15.57 GiB of which 41.75 MiB is free. Process 3917880 has 3.30 GiB memory in use. Process 3918000 has 3.30 GiB memory in use. Process 3917664 has 4.71 GiB memory in use. Process 3917780 has 3.84 GiB memory in use. Of the allocated memory 3.69 GiB is allocated by PyTorch, and 19.82 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "result_text_length": 0
+    },
+    {
+      "job_id": "751c833e-e331-49dc-8d4a-eb98afdb09f4",
+      "status": "failed",
+      "started_at": "2026-04-23T07:22:52.242270+00:00",
+      "completed_at": "2026-04-23T07:23:04.870229+00:00",
+      "error_message": "CUDA out of memory. Tried to allocate 16.00 MiB. GPU 0 has a total capacity of 15.57 GiB of which 41.75 MiB is free. Process 3917880 has 3.30 GiB memory in use. Process 3918000 has 3.30 GiB memory in use. Process 3917664 has 4.71 GiB memory in use. Process 3917780 has 3.84 GiB memory in use. Of the allocated memory 4.55 GiB is allocated by PyTorch, and 28.78 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "result_text_length": 0
+    }
+  ]
+}

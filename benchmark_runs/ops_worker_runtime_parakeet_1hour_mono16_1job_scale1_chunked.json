@@ -1,0 +1,24 @@
+{
+  "audio": "/app/uploads/ops-1hour-mono16.wav",
+  "jobs_requested": 1,
+  "poll_interval": 0.5,
+  "timeout": 600.0,
+  "elapsed_seconds": 25.623,
+  "timed_out": false,
+  "settings": {
+    "default_transcription_engine": "parakeet_ja",
+    "whisper_device": "cuda",
+    "engine": "parakeet_ja",
+    "model_size": "nvidia/parakeet-tdt_ctc-0.6b-ja"
+  },
+  "jobs": [
+    {
+      "job_id": "5e4d0806-4e33-4abe-a6b9-0e655e2e3b77",
+      "status": "completed",
+      "started_at": "2026-04-23T06:26:30.933658+00:00",
+      "completed_at": "2026-04-23T06:26:56.270119+00:00",
+      "error_message": null,
+      "result_text_length": 22963
+    }
+  ]
+}

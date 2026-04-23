@@ -2,6 +2,9 @@
 import asyncio
 from datetime import timedelta
 import logging
+import shutil
+import subprocess
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Callable, Generator, Optional
@@ -82,6 +85,78 @@ def get_parakeet_model(device: str = "auto"):
     return _parakeet_models[cache_key]
 
 
+def _run_media_command(command: list[str]) -> None:
+    subprocess.run(command, check=True, capture_output=True, text=True)
+
+
+def _ffprobe_duration(audio_path: Path) -> float:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(result.stdout.strip())
+
+
+def _normalize_audio_for_parakeet(source: Path, output_path: Path) -> Path:
+    _run_media_command(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(source),
+            "-ac",
+            "1",
+            "-ar",
+            str(settings.parakeet_sample_rate),
+            "-vn",
+            str(output_path),
+        ]
+    )
+    return output_path
+
+
+def _split_audio_for_parakeet(source: Path, output_dir: Path) -> list[Path]:
+    chunk_seconds = settings.parakeet_chunk_seconds
+    if chunk_seconds <= 0:
+        single_path = output_dir / "chunk_0000.wav"
+        shutil.copy2(source, single_path)
+        return [single_path]
+
+    pattern = output_dir / "chunk_%04d.wav"
+    _run_media_command(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(source),
+            "-f",
+            "segment",
+            "-segment_time",
+            str(chunk_seconds),
+            "-c",
+            "copy",
+            "-reset_timestamps",
+            "1",
+            str(pattern),
+        ]
+    )
+    chunks = sorted(output_dir.glob("chunk_*.wav"))
+    if not chunks:
+        raise RuntimeError("Parakeet chunking failed: no chunks were created")
+    return chunks
+
+
 def transcribe_audio_sync(
     audio_path: str,
     model_size: str = "medium",
@@ -144,16 +219,30 @@ def transcribe_audio_parakeet_sync(
     """Transcribe audio file using Parakeet JA."""
     runtime_device = resolve_runtime_device(device)
     model = get_parakeet_model(runtime_device)
-    result = model.transcribe([audio_path], batch_size=1)
-    item = result[0]
-    text = getattr(item, "text", str(item)).strip()
-    yield {
-        "text": text,
-        "start": 0.0,
-        "end": None,
-        "words": [],
-        "language": language,
-    }
+    source_path = Path(audio_path)
+    with tempfile.TemporaryDirectory(prefix="parakeet-job-") as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        normalized_path = temp_dir / "normalized.wav"
+        chunks_dir = temp_dir / "chunks"
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+
+        _normalize_audio_for_parakeet(source_path, normalized_path)
+        chunks = _split_audio_for_parakeet(normalized_path, chunks_dir)
+
+        chunk_offset = 0.0
+        for chunk_path in chunks:
+            result = model.transcribe([str(chunk_path)], batch_size=1)
+            item = result[0]
+            text = getattr(item, "text", str(item)).strip()
+            chunk_duration = _ffprobe_duration(chunk_path)
+            yield {
+                "text": text,
+                "start": chunk_offset,
+                "end": chunk_offset + chunk_duration,
+                "words": [],
+                "language": language,
+            }
+            chunk_offset += chunk_duration
 
 
 def transcribe_batch_job_sync(

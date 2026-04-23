@@ -35,7 +35,9 @@ async def prompt_templates_page(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """List prompt templates."""
-    stmt = select(PromptTemplate).where(PromptTemplate.is_active == True).order_by(PromptTemplate.name)
+    stmt = select(PromptTemplate).order_by(PromptTemplate.name)
+    if not current_user.is_admin:
+        stmt = stmt.where(PromptTemplate.is_active == True)
     prompt_templates = db.execute(stmt).scalars().all()
 
     return templates.TemplateResponse(

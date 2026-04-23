@@ -1,0 +1,32 @@
+{
+  "audio": "/app/uploads/ops-1hour-mono16.wav",
+  "jobs_requested": 2,
+  "poll_interval": 0.5,
+  "timeout": 600.0,
+  "elapsed_seconds": 53.719,
+  "timed_out": false,
+  "settings": {
+    "default_transcription_engine": "parakeet_ja",
+    "whisper_device": "cuda",
+    "engine": "parakeet_ja",
+    "model_size": "nvidia/parakeet-tdt_ctc-0.6b-ja"
+  },
+  "jobs": [
+    {
+      "job_id": "733a7c88-03d2-439a-ba95-af20354e421b",
+      "status": "completed",
+      "started_at": "2026-04-23T06:27:13.242350+00:00",
+      "completed_at": "2026-04-23T06:28:05.589267+00:00",
+      "error_message": null,
+      "result_text_length": 22963
+    },
+    {
+      "job_id": "126672d2-d883-43f8-89e8-06a8a93313bb",
+      "status": "completed",
+      "started_at": "2026-04-23T06:27:16.392109+00:00",
+      "completed_at": "2026-04-23T06:27:52.129010+00:00",
+      "error_message": null,
+      "result_text_length": 22963
+    }
+  ]
+}

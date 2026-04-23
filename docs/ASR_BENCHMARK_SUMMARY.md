@@ -22,6 +22,21 @@
 `xRealtime` から `3600 / xRealtime` で換算した目安です。
 実際には初回ロードや I/O が少し乗りますが、モデルの速さ感を見るにはこれで十分です。
 
+## 本番運用メモ
+
+`Parakeet` を本番 batch engine とする場合、この 4060 Ti 16GB では次が実用的です。
+
+- 基本構成: `worker=1`, `chunk=300秒`
+- 混雑時の上限: `worker=2`
+- 攻めた構成: `worker=3`, `chunk=120秒`, 他 GPU プロセス停止
+
+chunk 長の目安:
+- `120秒`: worker 数を増やしやすいが、CER は `300秒` より少し落ちる
+- `300秒`: 精度と安定性のバランスが最良
+- `600秒`: このマシンでは OOM
+
+詳細な運用実測は [ASR_OPERATIONS_RUNTIME_20260422.md](/home/ykadono/dev/mojiokoshi/docs/ASR_OPERATIONS_RUNTIME_20260422.md:1) を参照。
+
 ### 最終文字起こし
 
 | Model | 基準 | xRealtime | 1時間音声の目安 |

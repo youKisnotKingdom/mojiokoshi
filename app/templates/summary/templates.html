@@ -28,8 +28,18 @@
                 </div>
             </div>
             <div class="mt-4 flex items-center space-x-2">
-                <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">有効</span>
+                <span class="px-2 py-1 text-xs rounded {% if template.is_active %}bg-green-100 text-green-700{% else %}bg-gray-200 text-gray-700{% endif %}">
+                    {% if template.is_active %}有効{% else %}無効{% endif %}
+                </span>
                 {% if current_user.is_admin %}
+                <script type="application/json" id="template-data-{{ template.id }}">{{ {
+                    "id": template.id,
+                    "name": template.name,
+                    "description": template.description,
+                    "system_prompt": template.system_prompt,
+                    "user_prompt_template": template.user_prompt_template,
+                    "is_active": template.is_active
+                } | tojson }}</script>
                 <button onclick="editTemplate({{ template.id }})" class="text-sm text-primary-600 hover:text-primary-700">
                     編集
                 </button>
@@ -55,6 +65,7 @@
         <div class="p-6">
             <h2 class="text-xl font-bold text-gray-900" id="modal-title">新規プロンプトテンプレート</h2>
             <form id="template-form" class="mt-4 space-y-4">
+                <input type="hidden" name="template_id" value="">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">名前</label>
                     <input type="text" name="name" required class="form-input mt-1">
@@ -71,6 +82,12 @@
                     <label class="block text-sm font-medium text-gray-700">ユーザープロンプトテンプレート</label>
                     <textarea name="user_prompt_template" rows="4" required class="form-input mt-1" placeholder="文字起こしテキストのプレースホルダーとして {text} を使用してください"></textarea>
                 </div>
+                {% if current_user.is_admin %}
+                <label class="flex items-center space-x-2 text-sm text-gray-700">
+                    <input type="checkbox" name="is_active" class="rounded border-gray-300" checked>
+                    <span>有効にする</span>
+                </label>
+                {% endif %}
                 <div class="flex justify-end space-x-3 pt-4">
                     <button type="button" onclick="hideModal()" class="btn btn-secondary">キャンセル</button>
                     <button type="submit" id="template-submit-btn" class="btn btn-primary">保存</button>
@@ -88,6 +105,7 @@ const templateForm = document.getElementById('template-form');
 const templateSubmitBtn = document.getElementById('template-submit-btn');
 let isTemplateSaving = false;
 let isTemplateDirty = false;
+let editingTemplateId = null;
 
 function setTemplateSavingState(saving) {
     isTemplateSaving = saving;
@@ -100,6 +118,10 @@ function setTemplateSavingState(saving) {
 function showCreateModal() {
     document.getElementById('modal-title').textContent = '新規プロンプトテンプレート';
     templateForm.reset();
+    templateForm.elements.template_id.value = '';
+    const activeField = templateForm.elements.is_active;
+    if (activeField) activeField.checked = true;
+    editingTemplateId = null;
     isTemplateDirty = false;
     setTemplateSavingState(false);
     templateModal.classList.remove('hidden');
@@ -112,8 +134,20 @@ function hideModal() {
 }
 
 function editTemplate(id) {
-    // TODO: Implement edit functionality
-    alert('テンプレートを編集: ' + id);
+    const raw = document.getElementById(`template-data-${id}`).textContent;
+    const template = JSON.parse(raw);
+    document.getElementById('modal-title').textContent = 'プロンプトテンプレート編集';
+    templateForm.elements.template_id.value = template.id;
+    templateForm.elements.name.value = template.name || '';
+    templateForm.elements.description.value = template.description || '';
+    templateForm.elements.system_prompt.value = template.system_prompt || '';
+    templateForm.elements.user_prompt_template.value = template.user_prompt_template || '';
+    const activeField = templateForm.elements.is_active;
+    if (activeField) activeField.checked = template.is_active;
+    editingTemplateId = template.id;
+    isTemplateDirty = false;
+    setTemplateSavingState(false);
+    templateModal.classList.remove('hidden');
 }
 
 templateForm.addEventListener('input', () => {
@@ -134,11 +168,15 @@ templateForm.addEventListener('submit', async (e) => {
 
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
+    data.is_active = templateForm.elements.is_active ? templateForm.elements.is_active.checked : true;
+    delete data.template_id;
+    const method = editingTemplateId ? 'PUT' : 'POST';
+    const url = editingTemplateId ? `/summary/api/templates/${editingTemplateId}` : '/summary/api/templates';
 
     try {
         setTemplateSavingState(true);
-        const response = await fetch('/summary/api/templates', {
-            method: 'POST',
+        const response = await fetch(url, {
+            method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });

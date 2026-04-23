@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}運用状況 - {{ title }}{% endblock %}
+
+{% macro age_text(value) -%}
+    {%- if value is not none -%}{{ "%.1fs"|format(value) }}{%- else -%}-{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">運用状況</h1>
+            <p class="mt-1 text-sm text-gray-500">取得時刻: {{ snapshot.captured_at | jst_datetime }}</p>
+        </div>
+        <a href="/admin/operations/api/snapshot" class="btn btn-secondary">JSON</a>
+    </div>
+
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div class="card">
+            <p class="text-xs text-gray-500 uppercase">文字起こし Queue</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900">{{ snapshot.transcriptions.counts.total }}</p>
+            <div class="mt-3 space-y-1 text-sm text-gray-600">
+                <p>pending: {{ snapshot.transcriptions.counts.pending }}</p>
+                <p>processing: {{ snapshot.transcriptions.counts.processing }}</p>
+                <p>failed: {{ snapshot.transcriptions.counts.failed }}</p>
+            </div>
+        </div>
+        <div class="card">
+            <p class="text-xs text-gray-500 uppercase">要約 Queue</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900">{{ snapshot.summaries.counts.total }}</p>
+            <div class="mt-3 space-y-1 text-sm text-gray-600">
+                <p>pending: {{ snapshot.summaries.counts.pending }}</p>
+                <p>processing: {{ snapshot.summaries.counts.processing }}</p>
+                <p>failed: {{ snapshot.summaries.counts.failed }}</p>
+            </div>
+        </div>
+        <div class="card">
+            <p class="text-xs text-gray-500 uppercase">最古 Pending</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900">{{ age_text(snapshot.transcriptions.oldest_pending_age_seconds) }}</p>
+            <p class="mt-3 text-sm text-gray-600">要約: {{ age_text(snapshot.summaries.oldest_pending_age_seconds) }}</p>
+        </div>
+        <div class="card">
+            <p class="text-xs text-gray-500 uppercase">Stale 候補</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900">{{ snapshot.transcriptions.stale_processing_count }}</p>
+            <p class="mt-3 text-sm text-gray-600">要約: {{ snapshot.summaries.stale_processing_count }}</p>
+        </div>
+    </section>
+
+    <section class="card space-y-3">
+        <h2 class="text-lg font-semibold text-gray-900">Worker 設定</h2>
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm text-gray-700">
+            <div><span class="text-gray-500">Default engine:</span> {{ snapshot.worker.default_transcription_engine }}</div>
+            <div><span class="text-gray-500">Realtime:</span> {{ "on" if snapshot.worker.enable_realtime_transcription else "off" }}</div>
+            <div><span class="text-gray-500">Transcription concurrency:</span> {{ snapshot.worker.worker_transcription_concurrency }}</div>
+            <div><span class="text-gray-500">Summary concurrency:</span> {{ snapshot.worker.worker_summary_concurrency }}</div>
+            <div><span class="text-gray-500">Poll interval:</span> {{ snapshot.worker.worker_poll_interval }}s</div>
+            <div><span class="text-gray-500">Transcription stale timeout:</span> {{ snapshot.worker.worker_transcription_stale_timeout_seconds }}s</div>
+            <div><span class="text-gray-500">Summary stale timeout:</span> {{ snapshot.worker.worker_summary_stale_timeout_seconds }}s</div>
+            <div><span class="text-gray-500">Max upload size:</span> {{ snapshot.worker.max_upload_size_bytes }}</div>
+        </div>
+    </section>
+
+    <section class="space-y-4">
+        <h2 class="text-lg font-semibold text-gray-900">文字起こしジョブ</h2>
+        <div class="grid gap-4 xl:grid-cols-3">
+            <div class="card space-y-3">
+                <h3 class="font-medium text-gray-900">Pending</h3>
+                {% if snapshot.transcriptions.pending_jobs %}
+                <div class="space-y-3">
+                    {% for job in snapshot.transcriptions.pending_jobs %}
+                    <div class="border border-gray-200 rounded-lg p-3 text-sm">
+                        <div class="font-medium text-gray-900">{{ job.original_filename or "unknown" }}</div>
+                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}</div>
+                        <div class="mt-1 text-gray-500">待機: {{ age_text(job.pending_age_seconds) }}</div>
+                        <a class="mt-2 inline-block text-primary-600 hover:text-primary-700" href="/transcription/job/{{ job.id }}">詳細</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">pending job はありません。</p>
+                {% endif %}
+            </div>
+            <div class="card space-y-3">
+                <h3 class="font-medium text-gray-900">Processing</h3>
+                {% if snapshot.transcriptions.processing_jobs %}
+                <div class="space-y-3">
+                    {% for job in snapshot.transcriptions.processing_jobs %}
+                    <div class="border border-gray-200 rounded-lg p-3 text-sm">
+                        <div class="font-medium text-gray-900">{{ job.original_filename or "unknown" }}</div>
+                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}</div>
+                        <div class="mt-1 text-gray-500">処理中: {{ age_text(job.processing_age_seconds) }} / progress {{ "%.0f"|format(job.progress_percent) }}%</div>
+                        <div class="mt-2 flex items-center gap-3">
+                            <a class="text-primary-600 hover:text-primary-700" href="/transcription/job/{{ job.id }}">詳細</a>
+                            <form method="POST" action="/admin/operations/transcriptions/{{ job.id }}/requeue" onsubmit="return confirm('この文字起こしジョブを pending に戻しますか？');">
+                                <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
+                                <input type="hidden" name="next" value="{{ request.url.path }}">
+                                <button type="submit" class="text-sm text-amber-700 hover:text-amber-800">再キュー</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">processing job はありません。</p>
+                {% endif %}
+            </div>
+            <div class="card space-y-3">
+                <h3 class="font-medium text-gray-900">Recent failures</h3>
+                {% if snapshot.transcriptions.failed_jobs %}
+                <div class="space-y-3">
+                    {% for job in snapshot.transcriptions.failed_jobs %}
+                    <div class="border border-red-200 rounded-lg p-3 text-sm bg-red-50">
+                        <div class="font-medium text-gray-900">{{ job.original_filename or "unknown" }}</div>
+                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}</div>
+                        <div class="mt-1 text-red-700 whitespace-pre-wrap break-words">{{ job.error_message or "error message unavailable" }}</div>
+                        <div class="mt-2 flex items-center gap-3">
+                            <a class="text-primary-600 hover:text-primary-700" href="/transcription/job/{{ job.id }}">詳細</a>
+                            <form method="POST" action="/admin/operations/transcriptions/{{ job.id }}/requeue" onsubmit="return confirm('この失敗ジョブを再キューしますか？');">
+                                <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
+                                <input type="hidden" name="next" value="{{ request.url.path }}">
+                                <button type="submit" class="text-sm text-amber-700 hover:text-amber-800">再試行</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">failed job はありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="space-y-4">
+        <h2 class="text-lg font-semibold text-gray-900">要約ジョブ</h2>
+        <div class="grid gap-4 xl:grid-cols-3">
+            <div class="card space-y-3">
+                <h3 class="font-medium text-gray-900">Pending</h3>
+                {% if snapshot.summaries.pending_jobs %}
+                <div class="space-y-3">
+                    {% for summary in snapshot.summaries.pending_jobs %}
+                    <div class="border border-gray-200 rounded-lg p-3 text-sm">
+                        <div class="font-medium text-gray-900">{{ summary.original_filename or "unknown" }}</div>
+                        <div class="mt-1 text-gray-600">{{ summary.user_display_name or "-" }}</div>
+                        <div class="mt-1 text-gray-500">待機: {{ age_text(summary.pending_age_seconds) }}</div>
+                        <a class="mt-2 inline-block text-primary-600 hover:text-primary-700" href="/summary/job/{{ summary.id }}">詳細</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">pending summary はありません。</p>
+                {% endif %}
+            </div>
+            <div class="card space-y-3">
+                <h3 class="font-medium text-gray-900">Processing</h3>
+                {% if snapshot.summaries.processing_jobs %}
+                <div class="space-y-3">
+                    {% for summary in snapshot.summaries.processing_jobs %}
+                    <div class="border border-gray-200 rounded-lg p-3 text-sm">
+                        <div class="font-medium text-gray-900">{{ summary.original_filename or "unknown" }}</div>
+                        <div class="mt-1 text-gray-600">{{ summary.user_display_name or "-" }}</div>
+                        <div class="mt-1 text-gray-500">処理中: {{ age_text(summary.processing_age_seconds) }}</div>
+                        <div class="mt-2 flex items-center gap-3">
+                            <a class="text-primary-600 hover:text-primary-700" href="/summary/job/{{ summary.id }}">詳細</a>
+                            <form method="POST" action="/admin/operations/summaries/{{ summary.id }}/requeue" onsubmit="return confirm('この要約ジョブを pending に戻しますか？');">
+                                <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
+                                <input type="hidden" name="next" value="{{ request.url.path }}">
+                                <button type="submit" class="text-sm text-amber-700 hover:text-amber-800">再キュー</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">processing summary はありません。</p>
+                {% endif %}
+            </div>
+            <div class="card space-y-3">
+                <h3 class="font-medium text-gray-900">Recent failures</h3>
+                {% if snapshot.summaries.failed_jobs %}
+                <div class="space-y-3">
+                    {% for summary in snapshot.summaries.failed_jobs %}
+                    <div class="border border-red-200 rounded-lg p-3 text-sm bg-red-50">
+                        <div class="font-medium text-gray-900">{{ summary.original_filename or "unknown" }}</div>
+                        <div class="mt-1 text-gray-600">{{ summary.user_display_name or "-" }}</div>
+                        <div class="mt-1 text-red-700 whitespace-pre-wrap break-words">{{ summary.error_message or "error message unavailable" }}</div>
+                        <div class="mt-2 flex items-center gap-3">
+                            <a class="text-primary-600 hover:text-primary-700" href="/summary/job/{{ summary.id }}">詳細</a>
+                            <form method="POST" action="/admin/operations/summaries/{{ summary.id }}/requeue" onsubmit="return confirm('この失敗要約を再キューしますか？');">
+                                <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
+                                <input type="hidden" name="next" value="{{ request.url.path }}">
+                                <button type="submit" class="text-sm text-amber-700 hover:text-amber-800">再試行</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">failed summary はありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

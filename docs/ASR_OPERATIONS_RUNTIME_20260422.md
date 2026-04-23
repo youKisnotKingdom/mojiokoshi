@@ -1,11 +1,12 @@
 # ASR Operations Runtime Report
 
-更新日: 2026-04-22
+更新日: 2026-04-23
 
 このレポートは、現行デプロイ構成での実運用挙動を整理したものです。  
 対象は「複数ユーザーが同時にアップロードしたときに、DB・worker・モデル実行がどう振る舞うか」です。
 
 関連ファイル:
+- 管理画面: `/admin/operations`
 - SQL claim 実測: [queue_claim_test_20260421.json](/home/ykadono/dev/mojiokoshi/benchmark_runs/queue_claim_test_20260421.json:1)
 - stuck job 実測: [stale_job_recovery_test_20260422.json](/home/ykadono/dev/mojiokoshi/benchmark_runs/stale_job_recovery_test_20260422.json:1)
 - Parakeet worker 実行実測:
@@ -14,6 +15,8 @@
   - [2job c2](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_2job_c2.json:1)
   - [5job c1](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_5job_c1.json:1)
   - [5job c2](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_5job_c2.json:1)
+  - [5job scale1](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_5job_scale1_1worker.json:1)
+  - [5job scale2](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_5job_scale2_2workers.json:1)
 - モデル別待ち時間レポート: [ASR_OPERATIONS_CONCURRENCY_20260421.md](/home/ykadono/dev/mojiokoshi/docs/ASR_OPERATIONS_CONCURRENCY_20260421.md:1)
 
 ## 現行デプロイ構成
@@ -33,6 +36,7 @@
 - 実行デバイス: `GPU (worker)`
 - 同時文字起こし実行数: `1 worker process`
 - リアルタイム録音 UI: `off` 前提
+- `web` / `checker` は CPU のみ
 
 補足:
 - アプリ本体の batch worker は `Parakeet JA` と `faster-whisper` のみサポートします。
@@ -152,6 +156,36 @@ job ごとの終了時刻:
 - 短い job が大量に来ても、cold start さえ抜ければ queue はすぐ流れる
 - ただし `concurrency=2` を上げても、同一 process 内では wall time はほぼ縮まらない
 
+## 3.6 実 worker 2 本の queue drain 実測
+
+同じ 30 秒サンプル 5 件を、今度は **実際の worker container** に流して比較しました。
+
+### scale=1 worker
+
+- 条件: `worker=1`, `jobs=5`
+- 実測: `32.261秒`
+
+挙動:
+- 最初の 1 件が約 `27.1秒`
+- 残り 4 件は合計約 `0.46秒`
+- cold start が支配的
+
+### scale=2 workers
+
+- 条件: `worker=2`, `jobs=5`
+- 実測: `16.588秒`
+
+挙動:
+- 最初の 2 件が別 worker に割り振られる
+- 2 worker とも `Parakeet` を個別ロードする
+- その後の残り 3 件は warm 状態で高速に完了
+
+要点:
+- `SKIP LOCKED` により、複数 worker でも job はきれいに分散した
+- 同一 process の `concurrency=2` より、**別 worker 2 本** の方が明確に効く
+- ただし GPU 上では `Parakeet` の cold start が **2 回** 走る
+- worker を増やすと throughput は上がるが、GPU メモリと初期化コストはその分増える
+
 ## 4. 実運用で読むべき値
 
 実運用では 2 種類の時間を分けて見る必要があります。
@@ -170,6 +204,73 @@ job ごとの終了時刻:
 - **最初の 1 本だけ少し重い**
 - **連続投入時の本質的な throughput は benchmark 値に近い**
 
+## 4.1 1時間音声での worker 数比較
+
+長尺の実運用に近づけるため、`1時間音声` を `mono / 16kHz` に正規化し、`Parakeet` の production 経路と同じ chunking を通して worker 数を比較しました。
+
+### chunk=300秒
+
+- `1 worker / 1 job`: `25.623秒`
+- `1 worker / 2 jobs`: `55.789秒`
+- `2 workers / 2 jobs`: `53.719秒`
+- `3 workers / 3 jobs`: OOM
+
+要点:
+- `300秒` では `1 worker` は安定
+- `2 workers` までは通る
+- `3 workers` はこの GPU では載らない
+
+### chunk=120秒, 3 jobs 固定の公平比較
+
+`worker=1/2/3` を同じ `1時間音声 3本` で揃えて比較しました。
+
+- `1 worker / 3 jobs`: `77.943秒`
+- `2 workers / 3 jobs`: `64.811秒`
+- `3 workers / 3 jobs`: `61.247秒`
+
+要点:
+- `1 -> 2 workers` は意味がある
+- `2 -> 3 workers` の改善はかなり小さい
+- `3 workers` を通すには `chunk=120秒` まで短くする必要があった
+- `4 workers / 4 jobs / chunk=120秒` は OOM
+
+運用判断:
+- **安全運用**: `worker=1`, `chunk=300`
+- **実用上の上限**: `worker=2`
+- **攻めた構成**: `worker=3`, `chunk=120`, 他の GPU プロセス停止
+
+関連結果:
+- [1hour / 1job / scale1 / chunk300](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1hour_mono16_1job_scale1_chunked.json:1)
+- [1hour / 2jobs / scale1 / chunk300](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1hour_mono16_2job_scale1_chunked.json:1)
+- [1hour / 2jobs / scale2 / chunk300](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1hour_mono16_2job_scale2_chunked.json:1)
+- [1hour / 3jobs / scale1 / chunk120](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1hour_mono16_3job_scale1_chunk120.json:1)
+- [1hour / 3jobs / scale2 / chunk120](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1hour_mono16_3job_scale2_chunk120.json:1)
+- [1hour / 3jobs / scale3 / chunk120](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1hour_mono16_3job_scale3_chunk120.json:1)
+- [1hour / 4jobs / scale4 / chunk120](/home/ykadono/dev/mojiokoshi/benchmark_runs/ops_worker_runtime_parakeet_1hour_mono16_4job_scale4_chunk120.json:1)
+
+## 4.2 chunk 長と CER のトレードオフ
+
+`Parakeet` について、東大講義 3 本 (`BmtnWaUvX_0`, `jkUMzOFAVV4`, `ztkteH9oQJ4`) を `chunk=60/120/300秒` で比較しました。
+
+平均:
+
+- `60秒`: `CER 20.58%`, `169.28x realtime`
+- `120秒`: `CER 19.20%`, `186.37x realtime`
+- `300秒`: `CER 18.56%`, `143.47x realtime`
+- `600秒`: `BmtnWaUvX_0` 単体で **2 chunk 目に OOM**（CER 未完）
+
+読み方:
+- `300秒` が一番精度は良い
+- ただし `120秒` は平均で `+0.64pt` の悪化に留まり、速度はむしろ良かった
+- `60秒` まで刻むと劣化がはっきり見え始める
+- `600秒` まで伸ばすと、この GPU では単独実行でも VRAM 余裕が足りず非現実的
+
+したがって、`worker=3` を成立させるために `120秒` へ落とす判断はあり得るが、`60秒` まで短くする優先度は低い。
+逆に `600秒` のように長くする方向は、精度上の利益があってもこのマシンでは採りにくい。
+
+関連結果:
+- [chunk sweep reports](/home/ykadono/dev/mojiokoshi/benchmark_runs/chunk_cer_sweep_20260423)
+
 ## 5. 実運用上の結論
 
 現時点で言えること:
@@ -183,7 +284,7 @@ job ごとの終了時刻:
 ## 6. 次の実装優先順位
 
 1. queue 長 / 待ち時間 / 処理時間の可視化
-2. worker の別 process 並列を前提にした構成整理
+2. worker 数を増やしたときの GPU 使用量・安定性の継続観測
 3. stuck job の管理画面 / 手動再投入導線
 4. 必要なら `Cohere` を batch engine 候補として再計測
 
@@ -197,4 +298,4 @@ job ごとの終了時刻:
 - worker crash 後の stuck job は timeout ベースで自動回収
 
 次に優先すべきなのは **運用の見える化** です。  
-具体的には、queue の長さと待ち時間を UI や監視で見えるようにするべきです。
+具体的には、queue の長さと待ち時間を UI や監視で見えるようにし、必要なら `worker=2` までを段階的に使うのがよいです。
