@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import TranscriptionEngine, TranscriptionJob, TranscriptionStatus
+import app.services.speaker_diarization as speaker_diarization_service
 from app.time_utils import utc_now
 
 settings = get_settings()
@@ -231,17 +232,63 @@ def transcribe_audio_parakeet_sync(
 
         chunk_offset = 0.0
         for chunk_path in chunks:
-            result = model.transcribe([str(chunk_path)], batch_size=1)
+            result = model.transcribe(
+                [str(chunk_path)],
+                batch_size=1,
+                return_hypotheses=True,
+                timestamps=True,
+                verbose=False,
+            )
             item = result[0]
-            text = getattr(item, "text", str(item)).strip()
             chunk_duration = _ffprobe_duration(chunk_path)
-            yield {
-                "text": text,
-                "start": chunk_offset,
-                "end": chunk_offset + chunk_duration,
-                "words": [],
-                "language": language,
-            }
+            timestamps = getattr(item, "timestamp", None) or getattr(item, "timestep", None) or {}
+            words = timestamps.get("word") or []
+            segment_entries = timestamps.get("segment") or []
+
+            if segment_entries:
+                for segment in segment_entries:
+                    text = str(segment.get("segment", "")).strip()
+                    if not text:
+                        continue
+
+                    segment_start = chunk_offset + float(segment.get("start", 0.0) or 0.0)
+                    segment_end = chunk_offset + float(segment.get("end", 0.0) or 0.0)
+                    segment_words = []
+                    for word in words:
+                        word_start = chunk_offset + float(word.get("start", 0.0) or 0.0)
+                        word_end = chunk_offset + float(word.get("end", 0.0) or 0.0)
+                        if word_end > segment_start and word_start < segment_end:
+                            segment_words.append(
+                                {
+                                    "word": str(word.get("word", "")),
+                                    "start": word_start,
+                                    "end": word_end,
+                                }
+                            )
+
+                    yield {
+                        "text": text,
+                        "start": segment_start,
+                        "end": segment_end,
+                        "words": segment_words,
+                        "language": language,
+                    }
+            else:
+                text = getattr(item, "text", str(item)).strip()
+                yield {
+                    "text": text,
+                    "start": chunk_offset,
+                    "end": chunk_offset + chunk_duration,
+                    "words": [
+                        {
+                            "word": str(word.get("word", "")),
+                            "start": chunk_offset + float(word.get("start", 0.0) or 0.0),
+                            "end": chunk_offset + float(word.get("end", 0.0) or 0.0),
+                        }
+                        for word in words
+                    ],
+                    "language": language,
+                }
             chunk_offset += chunk_duration
 
 
@@ -412,6 +459,17 @@ async def process_transcription_job(
                 job.progress_percent = progress
                 db.commit()
                 await asyncio.sleep(0)
+
+        if settings.enable_speaker_diarization and job.enable_speaker_diarization:
+            try:
+                speaker_turns = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: speaker_diarization_service.diarize_audio(audio_path)
+                )
+                segments = speaker_diarization_service.assign_speakers_to_segments(
+                    segments, speaker_turns
+                )
+            except Exception as exc:
+                logger.warning("Speaker diarization failed for job %s: %s", job.id, exc)
 
         job.result_text = " ".join(full_text)
         job.result_segments = segments

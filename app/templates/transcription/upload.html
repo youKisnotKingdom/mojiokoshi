@@ -88,6 +88,26 @@
             Parakeet JA は本番向けの既定エンジンです。Faster Whisper を選ぶとモデルサイズ設定が有効になります。
         </p>
 
+        {% if speaker_diarization_enabled %}
+        <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            この環境では、batch 文字起こし完了後に話者分離も実行されます。
+        </div>
+
+        <label class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+            <input
+                type="checkbox"
+                name="enable_speaker_diarization"
+                value="true"
+                class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                {% if speaker_diarization_requested %}checked{% endif %}
+            >
+            <span class="text-sm text-gray-700">
+                <span class="block font-medium text-gray-900">このジョブで話者分離も実行する</span>
+                <span class="block text-xs text-gray-500">完了まで少し長くなる可能性があります。必要なジョブだけ有効にしてください。</span>
+            </span>
+        </label>
+        {% endif %}
+
         <div>
             <label for="language" class="label">言語（任意）</label>
             <select id="language" name="language" class="input">

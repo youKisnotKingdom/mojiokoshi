@@ -12,6 +12,7 @@ class TranscriptionJobCreate(BaseModel):
     engine: TranscriptionEngine = TranscriptionEngine.PARAKEET_JA
     model_size: str = "parakeet-tdt_ctc-0.6b-ja"
     language: str | None = None
+    enable_speaker_diarization: bool = False
 
 
 class TranscriptionJobResponse(BaseModel):
@@ -22,6 +23,7 @@ class TranscriptionJobResponse(BaseModel):
     engine: TranscriptionEngine
     model_size: str
     language: str | None
+    enable_speaker_diarization: bool
     result_text: str | None
     progress_percent: float
     error_message: str | None

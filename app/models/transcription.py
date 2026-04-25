@@ -54,6 +54,7 @@ class TranscriptionJob(Base):
         String(50), default="parakeet-tdt_ctc-0.6b-ja", nullable=False
     )
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)  # None = auto-detect
+    enable_speaker_diarization: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Results
     result_text: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     default_transcription_engine: str = "parakeet_ja"
     parakeet_chunk_seconds: int = 300
     parakeet_sample_rate: int = 16000
+    enable_speaker_diarization: bool = False
+    speaker_diarization_model_id: str = "pyannote/speaker-diarization-community-1"
+    speaker_diarization_model_path: str = ""
+    speaker_diarization_device: str = "cpu"
+    speaker_diarization_min_speakers: int = 0
+    speaker_diarization_max_speakers: int = 0
+    huggingface_token: str = ""
     enable_realtime_transcription: bool = True
     worker_poll_interval: float = 5.0
     worker_transcription_concurrency: int = 1

@@ -14,6 +14,7 @@ from app.models import AudioFile, AudioSource, Summary, TranscriptionEngine, Tra
 from app.models.user import User
 from app.schemas.transcription import TranscriptionJobResponse
 from app.services import storage
+from app.services.speaker_diarization import build_speaker_blocks
 from app.templating import templates
 from app.time_utils import utc_now
 
@@ -31,6 +32,7 @@ def _upload_page_context(
     current_user: User,
     *,
     error: str | None = None,
+    speaker_diarization_requested: bool = False,
 ) -> dict[str, object]:
     return {
         "request": request,
@@ -40,6 +42,8 @@ def _upload_page_context(
         "error": error,
         "max_upload_size_mb": _max_upload_size_mb(),
         "default_engine": settings.default_transcription_engine,
+        "speaker_diarization_enabled": settings.enable_speaker_diarization,
+        "speaker_diarization_requested": speaker_diarization_requested,
     }
 
 
@@ -63,6 +67,7 @@ def _upload_error_response(
     error: str,
     *,
     status_code: int,
+    speaker_diarization_requested: bool = False,
 ):
     if _is_ajax_upload(request):
         return JSONResponse(
@@ -74,7 +79,12 @@ def _upload_error_response(
         )
     return templates.TemplateResponse(
         "transcription/upload.html",
-        _upload_page_context(request, current_user, error=error),
+        _upload_page_context(
+            request,
+            current_user,
+            error=error,
+            speaker_diarization_requested=speaker_diarization_requested,
+        ),
         status_code=status_code,
     )
 
@@ -118,9 +128,12 @@ async def upload_file(
     engine: Annotated[str, Form()] = settings.default_transcription_engine,
     model_size: Annotated[str, Form()] = "medium",
     language: Annotated[str | None, Form()] = None,
+    enable_speaker_diarization: Annotated[str | None, Form()] = None,
     csrf_token: Annotated[str, Form()] = "",
 ):
     """Handle file upload and create transcription job."""
+    diarization_requested = settings.enable_speaker_diarization and bool(enable_speaker_diarization)
+
     if not verify_csrf_token(csrf_token):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -133,6 +146,7 @@ async def upload_file(
             current_user,
             "ファイルが選択されていません",
             status_code=400,
+            speaker_diarization_requested=diarization_requested,
         )
 
     # Check MIME type
@@ -142,6 +156,7 @@ async def upload_file(
             current_user,
             f"無効なファイル形式です: {file.content_type}。音声ファイルをアップロードしてください。",
             status_code=400,
+            speaker_diarization_requested=diarization_requested,
         )
 
     # Stream the upload to disk to keep memory usage bounded.
@@ -158,6 +173,7 @@ async def upload_file(
             current_user,
             f"ファイルが大きすぎます。最大サイズは{_max_upload_size_mb()}MBです。",
             status_code=400,
+            speaker_diarization_requested=diarization_requested,
         )
     finally:
         await file.close()
@@ -195,6 +211,7 @@ async def upload_file(
         engine=transcription_engine,
         model_size=effective_model_size,
         language=language if language else None,
+        enable_speaker_diarization=diarization_requested,
     )
     db.add(job)
     db.commit()
@@ -274,6 +291,9 @@ async def job_detail_page(
             "job": job,
             "summaries": summaries,
             "history_url": history_url,
+            "speaker_blocks": build_speaker_blocks(job.result_segments if isinstance(job.result_segments, list) else None),
+            "speaker_diarization_requested": job.enable_speaker_diarization,
+            "speaker_diarization_enabled": settings.enable_speaker_diarization,
         },
     )
 

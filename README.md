@@ -173,6 +173,43 @@ Recommended production profile:
 - Do not treat `worker=3` as a normal setting on this `16GB` GPU
 - Keep other GPU-heavy services such as `open-webui` off the same host or stopped during batch-heavy periods
 
+### Offline Speaker Diarization Model
+
+Speaker diarization is designed for offline deployment, but the `pyannote` model
+itself should be prepared once on a connected machine and then mounted into the app.
+
+Recommended runtime settings:
+
+```env
+ENABLE_SPEAKER_DIARIZATION=true
+SPEAKER_DIARIZATION_MODEL_PATH=/app/models/pyannote/speaker-diarization-community-1
+SPEAKER_DIARIZATION_DEVICE=cpu
+HUGGINGFACE_TOKEN=
+```
+
+Preparation flow:
+
+1. Accept the model conditions for `pyannote/speaker-diarization-community-1` on Hugging Face.
+2. Use an access token on a connected machine and download the model into your shared models directory.
+3. Mount that directory into the application so the runtime never needs internet access.
+
+Helper script:
+
+```bash
+# Use either `uvx hf auth login` / `hf auth login` or an explicit token.
+# export HUGGINGFACE_TOKEN=...
+python3 scripts/download_speaker_diarization_model.py \
+  --output-dir /path/to/models/pyannote/speaker-diarization-community-1
+```
+
+Then mount it into Docker, for example via the existing models volume or a host path, and set:
+
+```env
+SPEAKER_DIARIZATION_MODEL_PATH=/app/models/pyannote/speaker-diarization-community-1
+```
+
+At runtime, if `SPEAKER_DIARIZATION_MODEL_PATH` exists, the app does not fetch from Hugging Face.
+
 ### Configuration
 
 | Variable | Default | Description |

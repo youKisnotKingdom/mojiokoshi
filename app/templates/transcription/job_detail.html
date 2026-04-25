@@ -70,6 +70,36 @@
         </div>
     </div>
 
+    {% if speaker_diarization_requested and speaker_blocks %}
+    <div class="card">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">話者分離付き表示</h3>
+            <span class="text-xs text-gray-500">pyannote / exclusive diarization</span>
+        </div>
+        <div class="space-y-3">
+            {% for block in speaker_blocks %}
+            <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div class="mb-1 flex items-center justify-between">
+                    <span class="font-medium text-gray-900">{{ block.speaker }}</span>
+                    <span class="text-xs text-gray-500">{{ '%.1f'|format(block.start) }}s - {{ '%.1f'|format(block.end) }}s</span>
+                </div>
+                <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ block.text }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% elif speaker_diarization_requested and speaker_diarization_enabled %}
+    <div class="card">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-lg font-semibold text-gray-900">話者分離付き表示</h3>
+            <span class="text-xs text-gray-500">pyannote / exclusive diarization</span>
+        </div>
+        <p class="text-sm text-gray-600">
+            このジョブでは話者ラベルを付与できませんでした。話者数の推定失敗、モデル未設定、または diarization 実行時エラーの可能性があります。
+        </p>
+    </div>
+    {% endif %}
+
     <!-- Existing Summaries -->
     {% if summaries %}
     <div class="card">

@@ -52,6 +52,7 @@
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm text-gray-700">
             <div><span class="text-gray-500">Default engine:</span> {{ snapshot.worker.default_transcription_engine }}</div>
             <div><span class="text-gray-500">Realtime:</span> {{ "on" if snapshot.worker.enable_realtime_transcription else "off" }}</div>
+            <div><span class="text-gray-500">Speaker diarization:</span> {{ "on" if snapshot.worker.enable_speaker_diarization else "off" }}</div>
             <div><span class="text-gray-500">Transcription concurrency:</span> {{ snapshot.worker.worker_transcription_concurrency }}</div>
             <div><span class="text-gray-500">Summary concurrency:</span> {{ snapshot.worker.worker_summary_concurrency }}</div>
             <div><span class="text-gray-500">Poll interval:</span> {{ snapshot.worker.worker_poll_interval }}s</div>
@@ -71,7 +72,7 @@
                     {% for job in snapshot.transcriptions.pending_jobs %}
                     <div class="border border-gray-200 rounded-lg p-3 text-sm">
                         <div class="font-medium text-gray-900">{{ job.original_filename or "unknown" }}</div>
-                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}</div>
+                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}{% if job.enable_speaker_diarization %} / diarization{% endif %}</div>
                         <div class="mt-1 text-gray-500">待機: {{ age_text(job.pending_age_seconds) }}</div>
                         <a class="mt-2 inline-block text-primary-600 hover:text-primary-700" href="/transcription/job/{{ job.id }}">詳細</a>
                     </div>
@@ -88,7 +89,7 @@
                     {% for job in snapshot.transcriptions.processing_jobs %}
                     <div class="border border-gray-200 rounded-lg p-3 text-sm">
                         <div class="font-medium text-gray-900">{{ job.original_filename or "unknown" }}</div>
-                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}</div>
+                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}{% if job.enable_speaker_diarization %} / diarization{% endif %}</div>
                         <div class="mt-1 text-gray-500">処理中: {{ age_text(job.processing_age_seconds) }} / progress {{ "%.0f"|format(job.progress_percent) }}%</div>
                         <div class="mt-2 flex items-center gap-3">
                             <a class="text-primary-600 hover:text-primary-700" href="/transcription/job/{{ job.id }}">詳細</a>
@@ -112,7 +113,7 @@
                     {% for job in snapshot.transcriptions.failed_jobs %}
                     <div class="border border-red-200 rounded-lg p-3 text-sm bg-red-50">
                         <div class="font-medium text-gray-900">{{ job.original_filename or "unknown" }}</div>
-                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}</div>
+                        <div class="mt-1 text-gray-600">{{ job.user_display_name or "-" }} / {{ job.engine }}{% if job.enable_speaker_diarization %} / diarization{% endif %}</div>
                         <div class="mt-1 text-red-700 whitespace-pre-wrap break-words">{{ job.error_message or "error message unavailable" }}</div>
                         <div class="mt-2 flex items-center gap-3">
                             <a class="text-primary-600 hover:text-primary-700" href="/transcription/job/{{ job.id }}">詳細</a>
