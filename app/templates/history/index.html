@@ -9,7 +9,7 @@
             <h1 class="text-2xl font-bold text-gray-900">{{ history_title }}</h1>
             <p class="text-sm text-gray-500 mt-1">処理方式ごとに履歴を分けて表示します。</p>
         </div>
-        <a href="/transcription" class="btn btn-primary">
+        <a href="/transcription/upload" class="btn btn-primary">
             新規文字起こし
         </a>
     </div>
@@ -123,7 +123,7 @@
         </svg>
         {% if active_history_source == 'upload' %}
         <h3 class="mt-4 text-lg font-medium text-gray-900">アップロード履歴がありません</h3>
-        <p class="mt-2 text-gray-500">音声ファイルをアップロードすると、ここに履歴が表示されます。</p>
+        <p class="mt-2 text-gray-500">音声・動画ファイルをアップロードすると、ここに履歴が表示されます。</p>
         <a href="/transcription/upload" class="btn btn-primary mt-4 inline-block">ファイルをアップロード</a>
         {% else %}
         <h3 class="mt-4 text-lg font-medium text-gray-900">録音履歴がありません</h3>

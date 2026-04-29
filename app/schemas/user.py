@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.user import UserRole
 
@@ -40,18 +40,17 @@ class UserPasswordUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: str
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None
 
-    class Config:
-        from_attributes = True
-
 
 class LoginRequest(BaseModel):
-    user_id: str = Field(..., pattern=r"^\d{6}$")
+    user_id: str = Field(..., min_length=1, max_length=255)
     password: str
 
 

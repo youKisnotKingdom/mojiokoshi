@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <h1 class="text-2xl font-bold text-gray-900">文字起こしジョブ</h1>
         <div class="flex items-center space-x-4">
             <form action="/transcription/job/{{ job.id }}/delete" method="POST"
@@ -20,140 +20,370 @@
     </div>
 
     <div class="card">
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
                 <h2 class="text-lg font-semibold text-gray-900">
                     {{ job.audio_file.original_filename }}
                 </h2>
-                <p class="text-sm text-gray-500">
+                <p class="mt-1 text-sm text-gray-500">
                     アップロード日時: {{ job.created_at|jst_datetime('%Y-%m-%d %H:%M') }}
                 </p>
             </div>
-            <div class="text-right">
-                <span class="text-sm text-gray-500">エンジン:</span>
-                <span class="ml-1 px-2 py-1 text-xs bg-gray-100 rounded">{{ job.engine.value }}</span>
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="text-gray-500">エンジン:</span>
+                <span class="px-2 py-1 text-xs bg-gray-100 rounded">{{ job.engine.value }}</span>
+                {% if job.model_size %}
+                <span class="px-2 py-1 text-xs bg-gray-100 rounded">{{ job.model_size }}</span>
+                {% endif %}
             </div>
-        </div>
-
-        <div
-            id="job-progress"
-            hx-get="/transcription/job/{{ job.id }}/progress"
-            hx-trigger="load, every 2s [data-status='pending'], every 2s [data-status='processing']"
-            hx-swap="innerHTML"
-            data-status="{{ job.status.value }}"
-        >
-            {% include "transcription/partials/job_progress.html" %}
         </div>
     </div>
 
-    {% if job.is_complete and job.result_text %}
-    <div class="card">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-gray-900">文字起こし結果</h3>
-            <div class="flex space-x-2">
+    <div class="card" id="processing-timeline">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">処理タイムライン</h2>
+                <p class="mt-1 text-sm text-gray-600">
+                    文字起こしとLLM処理の状態、完了後の結果を同じ流れで確認できます。
+                </p>
+            </div>
+            {% if job.is_complete and job.result_text %}
+            <a href="#next-actions" class="btn btn-secondary text-sm">次の操作へ</a>
+            {% endif %}
+        </div>
+
+        <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-medium text-gray-900">処理ログ</h3>
+                <span class="text-xs text-gray-500">時刻は日本時間、経過は現在または完了時点まで</span>
+            </div>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="rounded-lg bg-white p-3">
+                    <div class="text-xs font-medium text-gray-500">アップロード</div>
+                    <div class="mt-1 text-sm text-gray-900">{{ job.created_at|jst_datetime('%Y-%m-%d %H:%M:%S') }}</div>
+                    <div class="mt-1 text-xs text-gray-500">音声長: {{ job.audio_file.duration_display if job.audio_file else '-' }}</div>
+                </div>
+                <div class="rounded-lg bg-white p-3">
+                    <div class="text-xs font-medium text-gray-500">文字起こし待機</div>
+                    <div class="mt-1 text-sm text-gray-900">
+                        {% if job.started_at %}{{ job.created_at|elapsed_between(job.started_at) }}{% else %}{{ job.created_at|elapsed_between }}{% endif %}
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500">開始: {{ job.started_at|jst_datetime('%H:%M:%S') if job.started_at else '未開始' }}</div>
+                </div>
+                <div class="rounded-lg bg-white p-3">
+                    <div class="text-xs font-medium text-gray-500">文字起こし処理</div>
+                    <div class="mt-1 text-sm text-gray-900">
+                        {% if job.started_at %}{{ job.started_at|elapsed_between(job.completed_at) }}{% else %}-{% endif %}
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500">完了: {{ job.completed_at|jst_datetime('%H:%M:%S') if job.completed_at else '処理中/未完了' }}</div>
+                </div>
+                <div class="rounded-lg bg-white p-3">
+                    <div class="text-xs font-medium text-gray-500">本文整形</div>
+                    <div class="mt-1 text-sm text-gray-900">
+                        {% if chunk_refinement_stats.total %}{{ chunk_refinement_stats.elapsed_seconds|duration_seconds }}{% else %}-{% endif %}
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500">
+                        {{ chunk_refinement_stats.completed }} / {{ chunk_refinement_stats.total }} 完了
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="relative mt-6 pl-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-gray-200">
+            <section class="relative pb-8">
+                <div class="absolute -left-8 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white">
+                    {% if job.status.value == 'completed' %}
+                    <span class="h-4 w-4 rounded-full bg-green-500 ring-4 ring-green-100"></span>
+                    {% elif job.status.value == 'failed' %}
+                    <span class="h-4 w-4 rounded-full bg-red-500 ring-4 ring-red-100"></span>
+                    {% elif job.status.value == 'processing' %}
+                    <span class="h-4 w-4 animate-pulse rounded-full bg-primary-500 ring-4 ring-primary-100"></span>
+                    {% else %}
+                    <span class="h-4 w-4 rounded-full bg-yellow-400 ring-4 ring-yellow-100"></span>
+                    {% endif %}
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 1</p>
+                            <h3 class="text-lg font-semibold text-gray-900">文字起こし</h3>
+                        </div>
+                        <div class="ml-auto flex flex-wrap justify-end gap-2">
+                            {% if job.is_complete and job.result_text %}
+                            <button
+                                type="button"
+                                onclick="copyElementText('result-text', this)"
+                                class="btn btn-secondary text-sm"
+                            >
+                                本文コピー
+                            </button>
+                            {% if speaker_blocks %}
+                            <button
+                                type="button"
+                                onclick="copyJsonText('speaker-result-data', this)"
+                                class="btn btn-secondary text-sm"
+                            >
+                                話者付きコピー
+                            </button>
+                            {% endif %}
+                            <a href="/transcription/job/{{ job.id }}/download/txt" class="btn btn-secondary text-sm">TXT</a>
+                            {% if speaker_blocks %}
+                            <a href="/transcription/job/{{ job.id }}/download/speaker-txt" class="btn btn-secondary text-sm">話者TXT</a>
+                            {% endif %}
+                            <a href="/transcription/job/{{ job.id }}/download/vtt" class="btn btn-secondary text-sm">VTT</a>
+                            <a href="/transcription/job/{{ job.id }}/download/json" class="btn btn-secondary text-sm">JSON</a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div
+                        id="job-progress"
+                        class="mt-4"
+                        hx-get="/transcription/job/{{ job.id }}/progress"
+                        hx-trigger="load, every 2s [this.dataset.status == 'pending' || this.dataset.status == 'processing']"
+                        hx-swap="innerHTML"
+                        data-status="{{ job.status.value }}"
+                    >
+                        {% include "transcription/partials/job_progress.html" %}
+                    </div>
+
+                    {% if job.is_complete and job.result_text %}
+                    <div id="transcription-result-card" class="mt-5 border-t border-gray-200 pt-5">
+                        <details class="rounded-lg border border-gray-200 bg-white p-4">
+                            <summary class="cursor-pointer font-medium text-gray-900">
+                                文字起こし全文を表示
+                                <span class="ml-2 text-xs font-normal text-gray-500">{{ job.result_text|length }}文字</span>
+                            </summary>
+                            <pre id="result-text" class="hidden">{{ job.result_text }}</pre>
+                            {% if job.chunks %}
+                            <div class="mt-4 space-y-3">
+                                {% for chunk in job.chunks %}
+                                {% set chunk_text = (chunk.raw_text or '').strip() %}
+                                {% if chunk_text %}
+                                <section class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                    <div class="mb-2">
+                                        <div class="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200">
+                                            {{ chunk.start_seconds|timecode }} - {{ chunk.end_seconds|timecode }}
+                                        </div>
+                                    </div>
+                                    <div class="whitespace-pre-wrap break-words text-sm leading-7 text-gray-800">{{ chunk_text }}</div>
+                                </section>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <pre class="mt-4 whitespace-pre-wrap break-words text-sm text-gray-700 font-sans">{{ job.result_text }}</pre>
+                            {% endif %}
+                        </details>
+                    </div>
+
+                    {% if speaker_diarization_requested and speaker_blocks %}
+                    <details class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <summary class="cursor-pointer font-medium text-gray-900">
+                            話者分離付き表示
+                            <span class="ml-2 text-xs font-normal text-gray-500">話者ラベル付き</span>
+                        </summary>
+                        <div class="mt-4 space-y-3">
+                            {% for block in speaker_blocks %}
+                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                                <div class="mb-1 flex items-center justify-between gap-3">
+                                    <span class="font-medium text-gray-900">{{ block.speaker }}</span>
+                                    <span class="text-xs text-gray-500">{{ '%.1f'|format(block.start) }}s - {{ '%.1f'|format(block.end) }}s</span>
+                                </div>
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ block.text }}</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% elif speaker_diarization_requested and speaker_diarization_enabled %}
+                    {% set diarization_status = job.speaker_diarization_status.value if job.speaker_diarization_status else 'not_requested' %}
+                    <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h4 class="font-medium text-gray-900">話者分離付き表示</h4>
+                            <span class="text-xs text-gray-500">
+                                {% if diarization_status == 'pending' %}
+                                待機中
+                                {% elif diarization_status == 'processing' %}
+                                処理中
+                                {% elif diarization_status == 'failed' %}
+                                失敗
+                                {% else %}
+                                話者ラベル付き
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% if diarization_status == 'pending' %}
+                        <p class="mt-2 text-sm text-gray-600">
+                            文字起こし本文は利用できます。話者分離は順番待ちです。
+                        </p>
+                        {% elif diarization_status == 'processing' %}
+                        <p class="mt-2 text-sm text-gray-600">
+                            文字起こし本文は利用できます。現在、話者ラベルを付与しています。
+                        </p>
+                        {% elif diarization_status == 'failed' %}
+                        <p class="mt-2 text-sm text-gray-600">
+                            このジョブでは話者ラベルを付与できませんでした。音声条件や設定により処理できなかった可能性があります。
+                        </p>
+                        {% if job.speaker_diarization_error %}
+                        <p class="mt-2 whitespace-pre-wrap break-words text-xs text-red-700">{{ job.speaker_diarization_error }}</p>
+                        {% endif %}
+                        {% else %}
+                        <p class="mt-2 text-sm text-gray-600">
+                            話者分離はまだ完了していません。完了するとここに話者付き表示が追加されます。
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </section>
+
+            {% include "transcription/partials/llm_processing_progress.html" %}
+        </div>
+    </div>
+
+    <div id="llm-result-panel" class="card hidden">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 pb-4">
+            <div>
+                <h3 id="llm-result-panel-title" class="text-lg font-semibold text-gray-900">LLM処理全文</h3>
+                <p id="llm-result-panel-subtitle" class="mt-1 text-sm text-gray-600">
+                    全文を別枠で表示しています。
+                </p>
+            </div>
+            <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                 <button
-                    onclick="copyToClipboard()"
+                    type="button"
+                    onclick="copyElementText('llm-result-panel-text', this)"
                     class="btn btn-secondary text-sm"
                 >
                     コピー
                 </button>
-                <form action="/summary/api/transcription/{{ job.id }}/summarize" method="POST" class="inline js-summary-form">
-                    <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
-                    <button type="submit" class="btn btn-primary text-sm js-summary-submit">
-                        要約
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    onclick="closeLlmResultPanel()"
+                    class="btn btn-secondary text-sm"
+                >
+                    閉じる
+                </button>
             </div>
         </div>
-        <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-            <pre id="result-text" class="whitespace-pre-wrap text-sm text-gray-700 font-sans">{{ job.result_text }}</pre>
+        <div id="llm-result-panel-meta" class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">モデル</div>
+                <div id="llm-result-panel-model" class="mt-1 truncate text-sm font-medium text-gray-900">-</div>
+            </div>
+            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">開始</div>
+                <div id="llm-result-panel-started" class="mt-1 text-sm font-medium text-gray-900">-</div>
+            </div>
+            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">完了 / 実行</div>
+                <div id="llm-result-panel-completed" class="mt-1 text-sm font-medium text-gray-900">-</div>
+                <div id="llm-result-panel-duration" class="mt-0.5 text-xs text-gray-500">-</div>
+            </div>
+            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">文字数</div>
+                <div id="llm-result-panel-chars" class="mt-1 text-sm font-medium text-gray-900">-</div>
+            </div>
         </div>
+        <div id="llm-result-panel-rich" class="mt-4 hidden max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-white p-4"></div>
+        <pre id="llm-result-panel-text" class="mt-4 max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-white p-4 whitespace-pre-wrap break-words text-sm text-gray-700 font-sans"></pre>
     </div>
 
-    {% if speaker_diarization_requested and speaker_blocks %}
-    <div class="card">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-gray-900">話者分離付き表示</h3>
-            <span class="text-xs text-gray-500">pyannote / exclusive diarization</span>
+    {% if job.is_complete and job.result_text %}
+    <div class="card" id="next-actions">
+        <div class="mb-5">
+            <h3 class="text-lg font-semibold text-gray-900">次の操作</h3>
+            <p class="mt-1 text-sm text-gray-600">
+                追加のLLM処理、別ファイルの処理、履歴確認に進めます。
+            </p>
         </div>
-        <div class="space-y-3">
-            {% for block in speaker_blocks %}
-            <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                <div class="mb-1 flex items-center justify-between">
-                    <span class="font-medium text-gray-900">{{ block.speaker }}</span>
-                    <span class="text-xs text-gray-500">{{ '%.1f'|format(block.start) }}s - {{ '%.1f'|format(block.end) }}s</span>
-                </div>
-                <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ block.text }}</p>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% elif speaker_diarization_requested and speaker_diarization_enabled %}
-    <div class="card">
-        <div class="flex items-center justify-between mb-2">
-            <h3 class="text-lg font-semibold text-gray-900">話者分離付き表示</h3>
-            <span class="text-xs text-gray-500">pyannote / exclusive diarization</span>
-        </div>
-        <p class="text-sm text-gray-600">
-            このジョブでは話者ラベルを付与できませんでした。話者数の推定失敗、モデル未設定、または diarization 実行時エラーの可能性があります。
-        </p>
-    </div>
-    {% endif %}
 
-    <!-- Existing Summaries -->
-    {% if summaries %}
-    <div class="card">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">要約一覧</h3>
-        <div class="space-y-4">
-            {% for summary in summaries %}
-            <div class="border border-gray-200 rounded-lg p-4">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm text-gray-500">
-                        {{ summary.created_at|jst_datetime('%Y-%m-%d %H:%M') }}
-                    </span>
-                    {% if summary.status.value == 'completed' %}
-                    <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">完了</span>
-                    {% elif summary.status.value == 'processing' %}
-                    <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">処理中</span>
-                    {% elif summary.status.value == 'pending' %}
-                    <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded">待機中</span>
-                    {% elif summary.status.value == 'failed' %}
-                    <span class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">失敗</span>
-                    {% endif %}
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h4 class="font-medium text-gray-900">別のLLM処理を実行</h4>
+                    <p class="mt-1 text-sm text-gray-600">
+                        話者分離付きの結果がある場合は、その内容を反映して処理します。
+                    </p>
                 </div>
-                {% if summary.status.value == 'completed' and summary.result_text %}
-                <div class="summary-preview prose prose-sm max-w-none text-gray-700 line-clamp-3"
-                     data-raw="{{ summary.result_text | e }}"></div>
-                <a href="/summary/job/{{ summary.id }}" class="text-sm text-primary-600 hover:text-primary-700 mt-2 inline-block">
-                    要約全文を表示 &rarr;
+                <a href="/summary/templates" class="text-sm text-primary-600 hover:text-primary-700">
+                    プロンプト管理
                 </a>
-                {% elif summary.status.value == 'failed' %}
-                <p class="text-sm text-red-600">{{ summary.error_message or 'エラーが発生しました' }}</p>
-                {% else %}
-                <a href="/summary/job/{{ summary.id }}" class="text-sm text-primary-600 hover:text-primary-700">
-                    ステータスを表示 &rarr;
-                </a>
-                {% endif %}
             </div>
-            {% endfor %}
+            <form action="/summary/api/transcription/{{ job.id }}/summarize" method="POST" class="mt-4 space-y-3 js-summary-form">
+                <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
+                <div>
+                    <label for="prompt-template" class="block text-sm font-medium text-gray-700">
+                        LLM処理プロンプト
+                    </label>
+                    <select id="prompt-template" name="prompt_template_id" class="form-input mt-1">
+                        <option value="">標準テンプレート（議事録・講義向け）</option>
+                        {% for template in prompt_templates %}
+                        <option value="{{ template.id }}">{{ template.name.strip() }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">プロンプトの内容は管理画面で編集できます。</p>
+                </div>
+                <button type="submit" class="btn btn-primary text-sm js-summary-submit">
+                    この設定で実行
+                </button>
+            </form>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3 border-t border-gray-200 pt-4">
+            <a href="/transcription/upload" class="btn btn-secondary text-sm">別の音声をアップロード</a>
+            <a href="{{ history_url }}" class="btn btn-secondary text-sm">履歴へ戻る</a>
+            {% if summaries %}
+            <a href="#llm-processing-progress" class="btn btn-secondary text-sm">LLM処理結果へ戻る</a>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
+    {% else %}
+    <div class="card">
+        <h3 class="text-lg font-semibold text-gray-900">完了後にできること</h3>
+        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+            <div class="rounded-lg bg-gray-50 p-3">
+                <div class="text-sm font-medium text-gray-900">確認・コピー</div>
+                <p class="mt-1 text-xs text-gray-600">文字起こし全文をタイムライン内で確認し、右上のボタンからコピーできます。</p>
+            </div>
+            <div class="rounded-lg bg-gray-50 p-3">
+                <div class="text-sm font-medium text-gray-900">保存</div>
+                <p class="mt-1 text-xs text-gray-600">TXT、VTT、JSON 形式でダウンロードできます。</p>
+            </div>
+            <div class="rounded-lg bg-gray-50 p-3">
+                <div class="text-sm font-medium text-gray-900">LLM処理</div>
+                <p class="mt-1 text-xs text-gray-600">文字起こし完了後、同じタイムラインでLLM処理の進捗と結果を確認できます。</p>
+            </div>
+        </div>
+    </div>
     {% endif %}
 </div>
 
 {% endblock %}
 
 {% block scripts %}
+<script type="application/json" id="speaker-result-data">{{ speaker_text | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-// 要約プレビューを Markdown レンダリング
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.summary-preview[data-raw]').forEach(function(el) {
-        el.innerHTML = marked.parse(el.dataset.raw);
+function renderSummaryPreviews(root) {
+    const scope = root || document;
+    scope.querySelectorAll('.summary-preview[data-raw]').forEach(function(el) {
+        const raw = el.dataset.raw || '';
+        if (window.marked) {
+            el.innerHTML = marked.parse(raw);
+        } else {
+            el.textContent = raw;
+        }
     });
+}
 
-    document.querySelectorAll('.js-summary-form').forEach(function(form) {
+function setupSummaryFormGuards(root) {
+    const scope = root || document;
+    scope.querySelectorAll('.js-summary-form').forEach(function(form) {
+        if (form.dataset.guardReady === 'true') return;
+        form.dataset.guardReady = 'true';
         form.addEventListener('submit', function(event) {
             if (form.dataset.submitting === 'true') {
                 event.preventDefault();
@@ -164,26 +394,212 @@ document.addEventListener('DOMContentLoaded', function() {
             const submitButton = form.querySelector('.js-summary-submit');
             if (submitButton) {
                 submitButton.disabled = true;
-                submitButton.textContent = '要約作成中...';
+                submitButton.textContent = 'LLM処理を作成中...';
                 submitButton.classList.add('opacity-70', 'cursor-not-allowed');
             }
         });
     });
+}
+
+function setLlmPollingPaused(paused) {
+    const container = document.getElementById('llm-processing-progress');
+    if (!container) return;
+
+    container.dataset.pollingPaused = paused ? 'true' : 'false';
+    if (paused && window.htmx) {
+        htmx.trigger(container, 'htmx:abort');
+    }
+}
+
+function isLlmResultPanelOpen() {
+    const panel = document.getElementById('llm-result-panel');
+    return Boolean(panel && !panel.classList.contains('hidden'));
+}
+
+function getTextContainerContent(element) {
+    if (!element) return '';
+    if (element instanceof HTMLTemplateElement) {
+        return element.content.textContent || '';
+    }
+    return element.textContent || '';
+}
+
+function setPanelText(id, value, fallback) {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.textContent = value || fallback || '-';
+}
+
+function setLlmResultPanelMeta(source) {
+    const dataset = source ? source.dataset : {};
+    const title = dataset.summaryTitle || 'LLM処理全文';
+    setPanelText('llm-result-panel-title', title);
+    setPanelText('llm-result-panel-model', dataset.summaryModel);
+    setPanelText('llm-result-panel-started', dataset.summaryStarted, '未開始');
+    setPanelText('llm-result-panel-completed', dataset.summaryCompleted, '未完了');
+    setPanelText('llm-result-panel-duration', dataset.summaryDuration, '実行 -');
+    setPanelText('llm-result-panel-chars', dataset.summaryChars);
+}
+
+function setLlmResultPanelBody(source, plainBody, richBody) {
+    const richSourceId = source ? source.dataset.llmRichSource : '';
+    const richSource = richSourceId ? document.getElementById(richSourceId) : null;
+    const hasRichBody = Boolean(richSource && richSource.innerHTML.trim());
+
+    if (hasRichBody) {
+        richBody.innerHTML = richSource.innerHTML;
+        richBody.classList.remove('hidden');
+        plainBody.classList.add('hidden');
+    } else {
+        richBody.innerHTML = '';
+        richBody.classList.add('hidden');
+        plainBody.classList.remove('hidden');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (sessionStorage.getItem('scrollToTranscriptionResult') === '{{ job.id }}') {
+        const resultCard = document.getElementById('transcription-result-card');
+        if (resultCard) {
+            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            sessionStorage.removeItem('scrollToTranscriptionResult');
+        }
+    }
+
+    renderSummaryPreviews(document);
+    setupSummaryFormGuards(document);
 });
 
-function copyToClipboard() {
-    const text = document.getElementById('result-text').textContent;
-    navigator.clipboard.writeText(text).then(() => {
-        alert('クリップボードにコピーしました！');
+function openLlmResultPanel(sourceElementId, button) {
+    const source = document.getElementById(sourceElementId);
+    const panel = document.getElementById('llm-result-panel');
+    const body = document.getElementById('llm-result-panel-text');
+    const richBody = document.getElementById('llm-result-panel-rich');
+    if (!source || !panel || !body || !richBody) {
+        setCopyButtonState(button, '表示失敗');
+        return;
+    }
+
+    body.textContent = getTextContainerContent(source);
+    setLlmResultPanelMeta(source);
+    setLlmResultPanelBody(source, body, richBody);
+    panel.classList.remove('hidden');
+    setLlmPollingPaused(true);
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeLlmResultPanel() {
+    const panel = document.getElementById('llm-result-panel');
+    const body = document.getElementById('llm-result-panel-text');
+    const richBody = document.getElementById('llm-result-panel-rich');
+    if (panel) panel.classList.add('hidden');
+    if (body) {
+        body.textContent = '';
+        body.classList.remove('hidden');
+    }
+    if (richBody) {
+        richBody.innerHTML = '';
+        richBody.classList.add('hidden');
+    }
+    setPanelText('llm-result-panel-title', 'LLM処理全文');
+    setPanelText('llm-result-panel-model');
+    setPanelText('llm-result-panel-started');
+    setPanelText('llm-result-panel-completed');
+    setPanelText('llm-result-panel-duration');
+    setPanelText('llm-result-panel-chars');
+    setLlmPollingPaused(false);
+}
+
+function setCopyButtonState(button, message) {
+    if (!button) return;
+    const originalText = button.dataset.originalText || button.textContent;
+    button.dataset.originalText = originalText;
+    button.textContent = message;
+    window.setTimeout(function() {
+        button.textContent = originalText;
+    }, 1400);
+}
+
+function fallbackCopyText(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        return Promise.resolve();
+    } catch (error) {
+        return Promise.reject(error);
+    } finally {
+        document.body.removeChild(textarea);
+    }
+}
+
+function writeClipboardText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    }
+    return fallbackCopyText(text);
+}
+
+function copyText(text, button) {
+    if (!text) return;
+    writeClipboardText(text).then(function() {
+        setCopyButtonState(button, 'コピー済み');
+    }).catch(function() {
+        setCopyButtonState(button, 'コピー失敗');
     });
 }
 
-// Update data-status attribute after HTMX swap
+function copyElementText(elementId, button) {
+    const element = document.getElementById(elementId);
+    copyText(element ? element.textContent : '', button);
+}
+
+function copyJsonText(scriptId, button) {
+    const element = document.getElementById(scriptId);
+    const text = element ? JSON.parse(element.textContent || '""') : '';
+    copyText(text, button);
+}
+
+document.body.addEventListener('click', function(event) {
+    if (!(event.target instanceof Element)) return;
+
+    const openButton = event.target.closest('.js-open-llm-result');
+    if (!openButton) return;
+
+    event.preventDefault();
+    openLlmResultPanel(openButton.dataset.llmResultSource, openButton);
+});
+
+document.body.addEventListener('htmx:beforeRequest', function(event) {
+    const target = event.detail.elt || event.target;
+    if (target && target.id === 'llm-processing-progress' && isLlmResultPanelOpen()) {
+        event.preventDefault();
+        setLlmPollingPaused(true);
+    }
+});
+
 document.body.addEventListener('htmx:afterSwap', function(event) {
     if (event.detail.target.id === 'job-progress') {
         const statusEl = event.detail.target.querySelector('[data-job-status]');
         if (statusEl) {
             event.detail.target.setAttribute('data-status', statusEl.dataset.jobStatus);
+            if (statusEl.dataset.jobStatus === 'completed' && !document.getElementById('transcription-result-card')) {
+                sessionStorage.setItem('scrollToTranscriptionResult', '{{ job.id }}');
+                window.location.reload();
+            }
+        }
+    }
+
+    if (event.detail.target.id === 'llm-processing-progress') {
+        const llmProgress = document.getElementById('llm-processing-progress') || document;
+        renderSummaryPreviews(llmProgress);
+        if (isLlmResultPanelOpen()) {
+            setLlmPollingPaused(true);
         }
     }
 });

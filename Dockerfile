@@ -42,6 +42,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir numpy typing_extensions \
     && pip install --no-cache-dir -r requirements.txt
 
+# Optional external OpenLDAP authentication client.
+# Keep this separate so enabling LDAP does not invalidate the large ASR dependency layer.
+RUN pip install --no-cache-dir "ldap3>=2.9.1,<3.0.0"
+
 # Copy application code
 COPY app ./app
 COPY demo ./demo

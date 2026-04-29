@@ -98,6 +98,66 @@ async def process_summary_jobs(poll_interval: float = 5.0, concurrency: int = 1)
     return len(summary_ids)
 
 
+async def process_chunk_refinement_jobs(poll_interval: float = 5.0, concurrency: int = 1) -> int:
+    """Claim and process pending per-transcription-chunk LLM refinement jobs."""
+    db = SessionLocal()
+    try:
+        summarization.requeue_stale_chunk_refinements(
+            db, settings.worker_chunk_refinement_stale_timeout_seconds
+        )
+        chunk_ids = summarization.claim_pending_chunk_refinements(db, limit=concurrency)
+    except Exception as e:
+        logger.error("Error claiming chunk refinement jobs: %s", e)
+        return 0
+    finally:
+        db.close()
+
+    if not chunk_ids:
+        return 0
+
+    async def _run(chunk_id):
+        logger.info("Processing chunk refinement: %s", chunk_id)
+        await _with_retry(
+            lambda: summarization.process_chunk_refinement_by_id(chunk_id),
+            chunk_id,
+            "chunk-refinement",
+            poll_interval,
+        )
+
+    await asyncio.gather(*[_run(chunk_id) for chunk_id in chunk_ids])
+    return len(chunk_ids)
+
+
+async def process_speaker_diarization_jobs(poll_interval: float = 5.0, concurrency: int = 1) -> int:
+    """Claim and process pending post-ASR speaker diarization jobs."""
+    db = SessionLocal()
+    try:
+        transcription.requeue_stale_speaker_diarization_jobs(
+            db, settings.worker_speaker_diarization_stale_timeout_seconds
+        )
+        job_ids = transcription.claim_pending_speaker_diarization_jobs(db, limit=concurrency)
+    except Exception as e:
+        logger.error("Error claiming speaker diarization jobs: %s", e)
+        return 0
+    finally:
+        db.close()
+
+    if not job_ids:
+        return 0
+
+    async def _run(job_id):
+        logger.info("Processing speaker diarization job: %s", job_id)
+        await _with_retry(
+            lambda: transcription.process_speaker_diarization_job_by_id(job_id),
+            job_id,
+            "speaker-diarization",
+            poll_interval,
+        )
+
+    await asyncio.gather(*[_run(job_id) for job_id in job_ids])
+    return len(job_ids)
+
+
 async def worker_loop(poll_interval: float | None = None):
     """Main worker loop that processes jobs continuously."""
     global _running, _cleanup_counter
@@ -105,32 +165,64 @@ async def worker_loop(poll_interval: float | None = None):
     _cleanup_counter = 0
 
     poll_interval = poll_interval or settings.worker_poll_interval
-    transcription_concurrency = max(1, settings.worker_transcription_concurrency)
-    summary_concurrency = max(1, settings.worker_summary_concurrency)
+    transcription_concurrency = max(0, settings.worker_transcription_concurrency)
+    chunk_refinement_concurrency = max(0, settings.worker_chunk_refinement_concurrency)
+    summary_concurrency = max(0, settings.worker_summary_concurrency)
+    speaker_diarization_concurrency = max(0, settings.worker_speaker_diarization_concurrency)
 
     logger.info(
         (
             "Worker started (poll_interval=%.1fs, transcription_concurrency=%d, "
-            "summary_concurrency=%d, transcription_stale_timeout=%ds, summary_stale_timeout=%ds)"
+            "chunk_refinement_concurrency=%d, summary_concurrency=%d, "
+            "speaker_diarization_concurrency=%d, "
+            "transcription_stale_timeout=%ds, chunk_refinement_stale_timeout=%ds, "
+            "summary_stale_timeout=%ds, speaker_diarization_stale_timeout=%ds)"
         ),
         poll_interval,
         transcription_concurrency,
+        chunk_refinement_concurrency,
         summary_concurrency,
+        speaker_diarization_concurrency,
         settings.worker_transcription_stale_timeout_seconds,
+        settings.worker_chunk_refinement_stale_timeout_seconds,
         settings.worker_summary_stale_timeout_seconds,
+        settings.worker_speaker_diarization_stale_timeout_seconds,
     )
 
     while _running:
         try:
-            transcription_count = await process_transcription_jobs(poll_interval, transcription_concurrency)
-            summary_count = await process_summary_jobs(poll_interval, summary_concurrency)
+            transcription_count = (
+                await process_transcription_jobs(poll_interval, transcription_concurrency)
+                if transcription_concurrency > 0
+                else 0
+            )
+            chunk_refinement_count = (
+                await process_chunk_refinement_jobs(poll_interval, chunk_refinement_concurrency)
+                if chunk_refinement_concurrency > 0
+                else 0
+            )
+            summary_count = (
+                await process_summary_jobs(poll_interval, summary_concurrency)
+                if summary_concurrency > 0
+                else 0
+            )
+            speaker_diarization_count = (
+                await process_speaker_diarization_jobs(poll_interval, speaker_diarization_concurrency)
+                if speaker_diarization_concurrency > 0
+                else 0
+            )
 
             _cleanup_counter += 1
             if _cleanup_counter >= CLEANUP_INTERVAL:
                 _cleanup_counter = 0
                 await cleanup.run_cleanup_job()
 
-            if transcription_count == 0 and summary_count == 0:
+            if (
+                transcription_count == 0
+                and chunk_refinement_count == 0
+                and summary_count == 0
+                and speaker_diarization_count == 0
+            ):
                 await asyncio.sleep(poll_interval)
 
         except asyncio.CancelledError:

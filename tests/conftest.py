@@ -9,6 +9,8 @@ import uuid
 
 # Set required env vars before importing any app module
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-used-in-production-32chars")
+os.environ.setdefault("ALLOWED_HOSTS", "testserver,localhost,127.0.0.1,::1")
+os.environ.setdefault("LLM_API_BASE_URL", "http://testserver/v1")
 os.environ.setdefault(
     "DATABASE_URL",
     os.environ.get("TEST_DATABASE_URL", "sqlite:///./test_mojiokoshi.db"),

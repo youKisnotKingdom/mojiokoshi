@@ -24,7 +24,19 @@ class TestLoginPage:
     def test_redirect_if_already_logged_in(self, admin_client):
         response = admin_client.get("/auth/login", follow_redirects=False)
         assert response.status_code == 302
-        assert response.headers["location"] == "/"
+        assert response.headers["location"] == "/transcription/upload"
+
+    def test_login_page_allows_ldap_identifier_when_enabled(self, client, monkeypatch):
+        from app.routers import auth as auth_router
+
+        monkeypatch.setattr(auth_router.settings, "ldap_enabled", True)
+
+        response = client.get("/auth/login")
+
+        assert response.status_code == 200
+        assert "ユーザーID / LDAP ID" in response.text
+        assert 'maxlength="255"' in response.text
+        assert 'pattern="\\d{6}"' not in response.text
 
 
 class TestLogin:
@@ -36,6 +48,7 @@ class TestLogin:
             follow_redirects=False,
         )
         assert response.status_code == 302
+        assert response.headers["location"] == "/transcription/upload"
         assert "session" in response.cookies
 
     def test_invalid_password(self, client, admin_user):
@@ -61,6 +74,7 @@ class TestLogin:
             data={"user_id": "000001", "password": "AdminPass1", "csrf_token": ""},
         )
         assert response.status_code == 403
+        assert "CSRFトークンが無効です" in response.text
 
     def test_inactive_user_cannot_login(self, client, db):
         from app.models.user import User, UserRole
@@ -82,6 +96,68 @@ class TestLogin:
             data={"user_id": "000099", "password": "InactivePass1", "csrf_token": csrf},
         )
         assert response.status_code == 401
+
+    def test_ldap_login_creates_local_linked_user(self, client, db, monkeypatch):
+        from app.models.user import User, UserRole
+        from app.services import auth as auth_service
+        from app.services.ldap_auth import LDAPAuthenticatedUser
+
+        monkeypatch.setattr(auth_service.settings, "ldap_enabled", True)
+        monkeypatch.setattr(
+            auth_service.ldap_auth,
+            "authenticate_ldap_user",
+            lambda user_id, password: LDAPAuthenticatedUser(
+                external_id="taro",
+                display_name="LDAP Taro",
+                is_admin=False,
+            )
+            if user_id == "taro" and password == "ldap-pass"
+            else None,
+        )
+
+        csrf = get_csrf_token(client)
+        response = client.post(
+            "/auth/login",
+            data={"user_id": "taro", "password": "ldap-pass", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert "session" in response.cookies
+        user = db.query(User).filter(User.external_auth_provider == "ldap").one()
+        assert user.external_auth_id == "taro"
+        assert user.display_name == "LDAP Taro"
+        assert user.role == UserRole.USER
+        assert user.user_id.isdigit()
+        assert len(user.user_id) == 6
+
+    def test_ldap_login_can_grant_admin_role(self, client, db, monkeypatch):
+        from app.models.user import UserRole
+        from app.services import auth as auth_service
+        from app.services.ldap_auth import LDAPAuthenticatedUser
+
+        monkeypatch.setattr(auth_service.settings, "ldap_enabled", True)
+        monkeypatch.setattr(
+            auth_service.ldap_auth,
+            "authenticate_ldap_user",
+            lambda user_id, password: LDAPAuthenticatedUser(
+                external_id="admin-ldap",
+                display_name="LDAP Admin",
+                is_admin=True,
+            ),
+        )
+
+        csrf = get_csrf_token(client)
+        response = client.post(
+            "/auth/login",
+            data={"user_id": "admin-ldap", "password": "ldap-pass", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        user = auth_service.get_user_by_external_auth(db, "ldap", "admin-ldap")
+        assert user is not None
+        assert user.role == UserRole.ADMIN
 
 
 class TestLogout:

@@ -6,7 +6,7 @@ from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -19,7 +19,6 @@ from app.database import SessionLocal
 from app.dependencies import get_current_user_optional, limiter
 from app.models.user import User
 from app.routers import auth, history, operations, recording_ws, summary, transcription, users
-from app.templating import templates
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ async def lifespan(app: FastAPI):
                 logger.info("LLM API is reachable at %s", settings.llm_api_base_url)
             except Exception:
                 logger.warning(
-                    "LLM API は %s に到達できません — LLMサーバーが起動するまで要約機能は利用できません。",
+                    "LLM API は %s に到達できません — LLMサーバーが起動するまでLLM処理は利用できません。",
                     settings.llm_api_base_url,
                 )
     yield
@@ -44,7 +43,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    description="音声文字起こし＆要約Webアプリケーション",
+    description="音声文字起こし＆LLM処理Webアプリケーション",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -101,16 +100,11 @@ async def readiness_check():
     return {"status": "ok", "db": "ok", "storage": "ok"}
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def index(
-    request: Request,
+    _request: Request,
     current_user: Annotated[User | None, Depends(get_current_user_optional)],
 ):
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "title": settings.app_name,
-            "current_user": current_user,
-        },
-    )
+    if current_user:
+        return RedirectResponse(url="/transcription/upload", status_code=303)
+    return RedirectResponse(url="/auth/login", status_code=303)

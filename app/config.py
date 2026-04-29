@@ -32,6 +32,22 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql://mojiokoshi:mojiokoshi@localhost:5432/mojiokoshi"
 
+    # Authentication
+    ldap_enabled: bool = False
+    ldap_server_uri: str = ""
+    ldap_bind_dn: str = ""
+    ldap_bind_password: str = ""
+    ldap_user_base_dn: str = ""
+    ldap_user_filter: str = "(uid={username})"
+    ldap_user_id_attribute: str = "uid"
+    ldap_display_name_attribute: str = "cn"
+    ldap_start_tls: bool = False
+    ldap_connect_timeout: int = 5
+    ldap_default_role: str = "user"
+    ldap_group_base_dn: str = ""
+    ldap_group_filter: str = "(member={user_dn})"
+    ldap_admin_group_dn: str = ""
+
     # Storage
     upload_dir: Path = Path("uploads")
     max_upload_size: int = 500 * 1024 * 1024  # 500MB
@@ -43,9 +59,9 @@ class Settings(BaseSettings):
     llm_api_base_url: str = "http://localhost:8000/v1"
     llm_api_key: str = ""
     llm_model_name: str = "default"
-    llm_max_tokens: int = 4096
+    llm_max_tokens: int = 8192
     llm_temperature: float = 0.7
-    llm_timeout: int = 120
+    llm_timeout: int = 300
 
     # Transcription
     whisper_model_size: str = "medium"
@@ -57,16 +73,25 @@ class Settings(BaseSettings):
     enable_speaker_diarization: bool = False
     speaker_diarization_model_id: str = "pyannote/speaker-diarization-community-1"
     speaker_diarization_model_path: str = ""
-    speaker_diarization_device: str = "cpu"
+    speaker_diarization_device: str = "auto"
     speaker_diarization_min_speakers: int = 0
     speaker_diarization_max_speakers: int = 0
     huggingface_token: str = ""
     enable_realtime_transcription: bool = True
     worker_poll_interval: float = 5.0
     worker_transcription_concurrency: int = 1
+    worker_chunk_refinement_concurrency: int = 1
     worker_summary_concurrency: int = 1
+    worker_speaker_diarization_concurrency: int = 0
     worker_transcription_stale_timeout_seconds: int = 3600
+    worker_chunk_refinement_stale_timeout_seconds: int = 1800
     worker_summary_stale_timeout_seconds: int = 1800
+    worker_speaker_diarization_stale_timeout_seconds: int = 14400
+    auto_llm_prompt_template_names: str = "文字起こし整形"
+    enable_chunk_llm_refinement: bool = True
+    llm_chunk_refinement_max_input_chars: int = 12000
+    llm_chunk_refinement_max_output_tokens: int = 2000
+    llm_chunk_refinement_context_chars: int = 1000
 
 
 @lru_cache

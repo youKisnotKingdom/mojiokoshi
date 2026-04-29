@@ -1,0 +1,317 @@
+<div
+    id="llm-processing-progress"
+    data-llm-active="{{ 'true' if llm_processing_active else 'false' }}"
+    data-polling-paused="false"
+    {% if llm_processing_active %}
+    hx-get="/transcription/job/{{ job.id }}/llm-processing-progress"
+    hx-trigger="every 2s"
+    hx-swap="outerHTML"
+    {% endif %}
+>
+    <section class="relative">
+        <div class="absolute -left-8 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white">
+            {% if job.status.value in ['pending', 'processing'] %}
+            <span class="h-4 w-4 rounded-full bg-gray-300 ring-4 ring-gray-100"></span>
+            {% elif summaries and llm_processing_active %}
+            <span class="h-4 w-4 animate-pulse rounded-full bg-primary-500 ring-4 ring-primary-100"></span>
+            {% elif summaries %}
+            <span class="h-4 w-4 rounded-full bg-green-500 ring-4 ring-green-100"></span>
+            {% elif auto_llm_processing_enabled and auto_llm_templates_available %}
+            <span class="h-4 w-4 animate-pulse rounded-full bg-yellow-400 ring-4 ring-yellow-100"></span>
+            {% elif auto_llm_processing_enabled %}
+            <span class="h-4 w-4 rounded-full bg-red-500 ring-4 ring-red-100"></span>
+            {% else %}
+            <span class="h-4 w-4 rounded-full bg-gray-300 ring-4 ring-gray-100"></span>
+            {% endif %}
+        </div>
+
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 2</p>
+                    <h3 class="text-lg font-semibold text-gray-900">LLM処理</h3>
+                </div>
+                {% if job.status.value in ['pending', 'processing'] %}
+                <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">文字起こし待ち</span>
+                {% elif summaries %}
+                <span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">結果 {{ summaries|length }}件</span>
+                {% elif auto_llm_processing_enabled and auto_llm_templates_available %}
+                <span class="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">ジョブ作成待ち</span>
+                {% elif auto_llm_processing_enabled %}
+                <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">自動設定要確認</span>
+                {% else %}
+                <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">未実行</span>
+                {% endif %}
+            </div>
+
+            {% if job.status.value in ['pending', 'processing'] %}
+            <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div class="flex items-center gap-3">
+                    {% if chunk_refinement_stats.total %}
+                    <div class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                    {% else %}
+                    <div class="h-3 w-3 rounded-full bg-gray-300"></div>
+                    {% endif %}
+                    <div>
+                        <p class="font-medium text-gray-900">
+                            {% if chunk_refinement_stats.total %}
+                            文字起こし本文を整えています
+                            {% else %}
+                            文字起こし結果待ち
+                            {% endif %}
+                        </p>
+                        <p class="mt-1 text-sm text-gray-600">
+                            {% if chunk_refinement_stats.total %}
+                            完了 {{ chunk_refinement_stats.completed }} / 全 {{ chunk_refinement_stats.total }} 区間。
+                            {% else %}
+                            文字起こしが進むと、本文の整形も順次開始します。
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                {% if chunk_refinement_stats.total %}
+                <div class="mt-3">
+                    <div class="mb-1 flex justify-between text-xs text-gray-500">
+                        <span>本文整形</span>
+                        <span>{{ chunk_refinement_stats.percent }}%</span>
+                    </div>
+                    <div class="h-2 overflow-hidden rounded-full bg-blue-100">
+                        <div
+                            class="h-2 rounded-full bg-blue-500 transition-all duration-500"
+                            style="width: {{ chunk_refinement_stats.percent }}%"
+                        ></div>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                        <span>処理中 {{ chunk_refinement_stats.processing }}</span>
+                        <span>待機 {{ chunk_refinement_stats.pending }}</span>
+                        <span>失敗 {{ chunk_refinement_stats.failed }}</span>
+                        {% if chunk_refinement_stats.first_started_at %}
+                        <span>開始 {{ chunk_refinement_stats.first_started_at|jst_datetime('%H:%M:%S') }}</span>
+                        <span>経過 {{ chunk_refinement_stats.elapsed_seconds|duration_seconds }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% elif chunk_refinement_stats.total and chunk_refinement_stats.is_active %}
+            <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div class="flex items-center gap-3">
+                    <div class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                    <div>
+                        <p class="font-medium text-blue-800">本文整形の完了待ち...</p>
+                        <p class="mt-1 text-sm text-blue-700">
+                            完了 {{ chunk_refinement_stats.completed }} / 全 {{ chunk_refinement_stats.total }} 区間。
+                        </p>
+                    </div>
+                </div>
+                <div class="mt-3 h-2 overflow-hidden rounded-full bg-blue-100">
+                    <div
+                        class="h-2 rounded-full bg-blue-500 transition-all duration-500"
+                        style="width: {{ chunk_refinement_stats.percent }}%"
+                    ></div>
+                </div>
+            </div>
+
+            {% elif not summaries and auto_llm_processing_enabled and auto_llm_templates_available %}
+            <div class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                <div class="flex items-center gap-3">
+                    <div class="h-4 w-4 animate-spin rounded-full border-2 border-yellow-600 border-t-transparent"></div>
+                    <div>
+                        <p class="font-medium text-yellow-800">LLM処理を準備中...</p>
+                        <p class="mt-1 text-sm text-yellow-700">
+                            文字起こしは完了しています。設定済みの処理を開始します。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {% elif not summaries and auto_llm_processing_enabled %}
+            <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+                <p class="font-medium text-red-800">自動LLM処理を開始できません</p>
+                <p class="mt-1 text-sm text-red-700">
+                    プロンプト管理で設定を確認するか、下の「次の操作」から手動で実行してください。
+                </p>
+            </div>
+
+            {% elif not summaries %}
+            <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p class="font-medium text-gray-900">LLM処理はまだ実行されていません</p>
+                <p class="mt-1 text-sm text-gray-600">
+                    下の「次の操作」からプロンプトを選ぶと、文字起こし整形や議事録化を実行できます。
+                </p>
+            </div>
+
+            {% else %}
+            <div class="mt-4 space-y-3">
+                {% for row in summary_display_rows %}
+                {% set summary = row.summary %}
+                {% set summary_meta = row.meta %}
+                {% set summary_title = row.title %}
+                {% set display_started_at = row.started_at %}
+                {% set display_completed_at = row.completed_at %}
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <div class="font-medium text-gray-900">
+                                {{ summary_title }}
+                            </div>
+                            <div class="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+                                <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200">
+                                    <div class="font-medium text-gray-500">開始</div>
+                                    <div class="mt-0.5 text-gray-900">{{ display_started_at|jst_datetime('%H:%M:%S') if display_started_at else '-' }}</div>
+                                </div>
+                                <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200">
+                                    <div class="font-medium text-gray-500">実行</div>
+                                    <div class="mt-0.5 text-gray-900">{{ display_started_at|elapsed_between(display_completed_at) if display_started_at else '-' }}</div>
+                                </div>
+                                <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200">
+                                    <div class="font-medium text-gray-500">完了</div>
+                                    <div class="mt-0.5 text-gray-900">{{ display_completed_at|jst_datetime('%H:%M:%S') if display_completed_at else '-' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+                            {% if summary.status.value == 'completed' and summary.result_text %}
+                            <button
+                                type="button"
+                                onclick="copyElementText('summary-result-text-{{ summary.id }}', this)"
+                                class="btn btn-secondary text-sm"
+                            >
+                                コピー
+                            </button>
+                            <a href="/summary/job/{{ summary.id }}/download/md" class="btn btn-secondary text-sm">MD</a>
+                            <a href="/summary/job/{{ summary.id }}/download/txt" class="btn btn-secondary text-sm">TXT</a>
+                            {% endif %}
+
+                            {% if summary.status.value == 'completed' %}
+                            <span class="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">完了</span>
+                            {% elif summary.status.value == 'processing' %}
+                            <span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">処理中</span>
+                            {% elif summary.status.value == 'pending' %}
+                            <span class="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">待機中</span>
+                            {% elif summary.status.value == 'failed' %}
+                            <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">失敗</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if row.uses_chunk_refinement and chunk_refinement_stats.is_active %}
+                    <div class="mt-3 flex items-center gap-3 text-sm text-blue-700">
+                        <div class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                        <span>完了した区間から順に本文を整えています。</span>
+                    </div>
+                    {% elif summary.status.value == 'pending' %}
+                    <div class="mt-3 flex items-center gap-3 text-sm text-yellow-700">
+                        <div class="animate-pulse h-2.5 w-2.5 rounded-full bg-yellow-400"></div>
+                        <span>LLM処理は順番待ちです。</span>
+                    </div>
+                    {% elif summary.status.value == 'processing' %}
+                    <div class="mt-3 space-y-2">
+                        <div class="flex items-center gap-3 text-sm text-blue-700">
+                            <div class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                            <span>LLMに文字起こしを渡して処理しています。</span>
+                        </div>
+                        <div class="h-2 overflow-hidden rounded-full bg-blue-100">
+                            <div class="h-2 w-2/3 animate-pulse rounded-full bg-blue-500"></div>
+                        </div>
+                    </div>
+                    {% elif summary.status.value == 'completed' and summary.result_text %}
+                    {% if summary_meta.get('finish_reason') == 'length' %}
+                    <div class="mt-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                        結果が途中で切れている可能性があります。必要に応じて設定を確認してください。
+                    </div>
+                    {% endif %}
+                    <pre
+                        id="summary-result-text-{{ summary.id }}"
+                        class="hidden"
+                        data-summary-title="{{ summary_title }}"
+                        data-summary-model="{{ summary.model_name or 'default' }}"
+                        data-summary-started="{{ display_started_at|jst_datetime('%Y-%m-%d %H:%M:%S') if display_started_at else '' }}"
+                        data-summary-completed="{{ display_completed_at|jst_datetime('%Y-%m-%d %H:%M:%S') if display_completed_at else '' }}"
+                        data-summary-duration="{{ display_started_at|elapsed_between(display_completed_at) if display_started_at else '' }}"
+                        data-summary-chars="{{ summary.result_text|length }}文字"
+                        {% if summary_meta.get('source') == 'chunk_refinement' and job.chunks %}
+                        data-llm-rich-source="summary-result-rich-{{ summary.id }}"
+                        {% endif %}
+                    >{{ summary.result_text }}</pre>
+                    {% if summary_meta.get('source') == 'chunk_refinement' and job.chunks %}
+                    <div id="summary-result-rich-{{ summary.id }}" class="hidden">
+                        <div class="space-y-3">
+                            {% for chunk in job.chunks %}
+                            {% set chunk_text = (chunk.refined_text or chunk.raw_text or '').strip() %}
+                            {% if chunk_text %}
+                            <section class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                <div class="mb-2">
+                                    <div class="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200">
+                                        {{ chunk.start_seconds|timecode }} - {{ chunk.end_seconds|timecode }}
+                                    </div>
+                                </div>
+                                <div class="whitespace-pre-wrap break-words text-sm leading-7 text-gray-800">{{ chunk_text }}</div>
+                            </section>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% set summary_preview_text = summary.result_text|strip_timecode_prefixes %}
+                    <div class="prose prose-sm max-w-none whitespace-pre-wrap break-words text-gray-700 mt-3 rounded-md bg-white p-3" data-summary-preview>{{ summary_preview_text[:700] }}{% if summary_preview_text|length > 700 %}...{% endif %}</div>
+                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            class="btn btn-secondary text-sm js-open-llm-result"
+                            data-llm-result-source="summary-result-text-{{ summary.id }}"
+                            aria-controls="llm-result-panel"
+                        >
+                            全文を表示
+                        </button>
+                        <span class="text-xs text-gray-500">{{ summary.result_text|length }}文字</span>
+                    </div>
+                    {% elif summary.status.value == 'failed' %}
+                    <p class="mt-3 text-sm text-red-700 whitespace-pre-wrap">{{ summary.error_message or 'エラーが発生しました' }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if progressive_refined_chunks and (chunk_refinement_stats.is_active or not summaries) %}
+            <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h4 class="font-medium text-blue-950">整形済み本文</h4>
+                        <p class="mt-1 text-sm text-blue-800">
+                            完了した区間から順に表示しています。
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-blue-800 ring-1 ring-blue-200">
+                            {{ progressive_refined_chunks|length }} / {{ chunk_refinement_stats.total }} 区間
+                        </span>
+                        <button
+                            type="button"
+                            onclick="copyElementText('progressive-refined-text-{{ job.id }}', this)"
+                            class="btn btn-secondary text-sm"
+                        >
+                            コピー
+                        </button>
+                    </div>
+                </div>
+                <pre id="progressive-refined-text-{{ job.id }}" class="hidden">{{ progressive_refined_text }}</pre>
+                <div class="mt-3 max-h-[34rem] space-y-3 overflow-auto rounded-lg border border-blue-100 bg-white p-3">
+                    {% for chunk in progressive_refined_chunks %}
+                    <section class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div class="mb-2">
+                            <div class="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200">
+                                {{ chunk.start_seconds|timecode }} - {{ chunk.end_seconds|timecode }}
+                            </div>
+                        </div>
+                        <div class="whitespace-pre-wrap break-words text-sm leading-7 text-gray-800">{{ chunk.text }}</div>
+                    </section>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</div>

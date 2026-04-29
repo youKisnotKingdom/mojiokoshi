@@ -1,12 +1,17 @@
+import secrets
+
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
+from app.services import ldap_auth
 from app.time_utils import utc_now
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+settings = get_settings()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -22,6 +27,16 @@ def get_password_hash(password: str) -> str:
 def get_user_by_user_id(db: Session, user_id: str) -> User | None:
     """Get a user by their 6-digit user ID."""
     stmt = select(User).where(User.user_id == user_id)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def get_user_by_external_auth(db: Session, provider: str, external_id: str) -> User | None:
+    """Get a user linked to an external authentication provider."""
+    stmt = (
+        select(User)
+        .where(User.external_auth_provider == provider)
+        .where(User.external_auth_id == external_id)
+    )
     return db.execute(stmt).scalar_one_or_none()
 
 
@@ -65,21 +80,70 @@ def create_user(db: Session, user_data: UserCreate, user_id: str | None = None) 
     return user
 
 
+def _new_unlinked_password_hash() -> str:
+    return get_password_hash(secrets.token_urlsafe(32))
+
+
+def _generate_unused_user_id(db: Session) -> str:
+    while True:
+        user_id = User.generate_user_id()
+        if not get_user_by_user_id(db, user_id):
+            return user_id
+
+
+def _ldap_default_role() -> UserRole:
+    try:
+        return UserRole(settings.ldap_default_role)
+    except ValueError:
+        return UserRole.USER
+
+
+def _get_or_create_ldap_user(
+    db: Session,
+    ldap_user: ldap_auth.LDAPAuthenticatedUser,
+) -> User:
+    user = get_user_by_external_auth(db, "ldap", ldap_user.external_id)
+    role = UserRole.ADMIN if ldap_user.is_admin else _ldap_default_role()
+
+    if user:
+        user.display_name = ldap_user.display_name or user.display_name
+        user.role = role
+        user.is_active = True
+        user.last_login_at = utc_now()
+        db.commit()
+        db.refresh(user)
+        return user
+
+    user = User(
+        user_id=_generate_unused_user_id(db),
+        external_auth_provider="ldap",
+        external_auth_id=ldap_user.external_id,
+        password_hash=_new_unlinked_password_hash(),
+        display_name=ldap_user.display_name or ldap_user.external_id,
+        role=role,
+        is_active=True,
+        last_login_at=utc_now(),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def authenticate_user(db: Session, user_id: str, password: str) -> User | None:
     """Authenticate a user and return the user object if successful."""
-    user = get_user_by_user_id(db, user_id)
-    if not user:
-        return None
-    if not user.is_active:
-        return None
-    if not verify_password(password, user.password_hash):
-        return None
+    user_id = user_id.strip()
+    user = get_user_by_user_id(db, user_id) if user_id.isdigit() and len(user_id) == 6 else None
+    if user and user.is_active and verify_password(password, user.password_hash):
+        user.last_login_at = utc_now()
+        db.commit()
+        return user
 
-    # Update last login time
-    user.last_login_at = utc_now()
-    db.commit()
+    ldap_user = ldap_auth.authenticate_ldap_user(user_id, password)
+    if ldap_user:
+        return _get_or_create_ldap_user(db, ldap_user)
 
-    return user
+    return None
 
 
 def update_user_password(db: Session, user: User, new_password: str) -> User:

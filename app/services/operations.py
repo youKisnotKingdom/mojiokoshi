@@ -8,7 +8,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import get_settings
-from app.models import Summary, SummaryStatus, TranscriptionJob, TranscriptionStatus
+from app.models import (
+    SpeakerDiarizationStatus,
+    Summary,
+    SummaryStatus,
+    TranscriptionJob,
+    TranscriptionStatus,
+)
 from app.time_utils import utc_now
 
 settings = get_settings()
@@ -36,6 +42,11 @@ def _serialize_transcription_job(job: TranscriptionJob) -> dict[str, object]:
         "engine": job.engine.value,
         "model_size": job.model_size,
         "enable_speaker_diarization": job.enable_speaker_diarization,
+        "speaker_diarization_status": (
+            job.speaker_diarization_status.value
+            if job.speaker_diarization_status
+            else SpeakerDiarizationStatus.NOT_REQUESTED.value
+        ),
         "user_display_name": job.user.display_name if job.user else None,
         "original_filename": job.audio_file.original_filename if job.audio_file else None,
         "created_at": job.created_at,
@@ -122,6 +133,20 @@ def build_operations_snapshot(db: Session) -> dict[str, object]:
     summary_processing = list(db.execute(summary_processing_stmt).unique().scalars().all())
     summary_failed = list(db.execute(summary_failed_stmt).unique().scalars().all())
 
+    speaker_diarization_counts = {status.value: 0 for status in SpeakerDiarizationStatus}
+    speaker_diarization_rows = db.execute(
+        select(TranscriptionJob.speaker_diarization_status, func.count())
+        .group_by(TranscriptionJob.speaker_diarization_status)
+    ).all()
+    for diarization_status, count in speaker_diarization_rows:
+        key = (
+            diarization_status.value
+            if isinstance(diarization_status, SpeakerDiarizationStatus)
+            else str(diarization_status)
+        )
+        speaker_diarization_counts[key] = count
+    speaker_diarization_counts["total"] = sum(speaker_diarization_counts.values())
+
     transcription_stale_count = 0
     if settings.worker_transcription_stale_timeout_seconds > 0:
         cutoff = now - timedelta(seconds=settings.worker_transcription_stale_timeout_seconds)
@@ -154,8 +179,10 @@ def build_operations_snapshot(db: Session) -> dict[str, object]:
             "worker_poll_interval": settings.worker_poll_interval,
             "worker_transcription_concurrency": settings.worker_transcription_concurrency,
             "worker_summary_concurrency": settings.worker_summary_concurrency,
+            "worker_speaker_diarization_concurrency": settings.worker_speaker_diarization_concurrency,
             "worker_transcription_stale_timeout_seconds": settings.worker_transcription_stale_timeout_seconds,
             "worker_summary_stale_timeout_seconds": settings.worker_summary_stale_timeout_seconds,
+            "worker_speaker_diarization_stale_timeout_seconds": settings.worker_speaker_diarization_stale_timeout_seconds,
             "max_upload_size_bytes": settings.max_upload_size,
         },
         "transcriptions": {
@@ -165,6 +192,9 @@ def build_operations_snapshot(db: Session) -> dict[str, object]:
             "pending_jobs": [_serialize_transcription_job(job) for job in transcription_pending],
             "processing_jobs": [_serialize_transcription_job(job) for job in transcription_processing],
             "failed_jobs": [_serialize_transcription_job(job) for job in transcription_failed],
+        },
+        "speaker_diarization": {
+            "counts": speaker_diarization_counts,
         },
         "summaries": {
             "counts": _status_counts(db, Summary, SummaryStatus),

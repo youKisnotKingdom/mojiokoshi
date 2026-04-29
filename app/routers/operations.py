@@ -91,6 +91,6 @@ async def requeue_summary(
         raise HTTPException(status_code=400, detail=str(e))
 
     if not summary:
-        raise HTTPException(status_code=404, detail="要約ジョブが見つかりません")
+        raise HTTPException(status_code=404, detail="LLM処理ジョブが見つかりません")
 
     return RedirectResponse(url=next_url, status_code=303)

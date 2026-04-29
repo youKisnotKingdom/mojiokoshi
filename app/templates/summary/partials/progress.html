@@ -2,7 +2,7 @@
     id="summary-progress"
     data-summary-status="{{ summary.status.value }}"
     hx-get="/summary/api/job/{{ summary.id }}/progress"
-    hx-trigger="every 2s [data-summary-status='pending'], every 2s [data-summary-status='processing']"
+    hx-trigger="every 2s [this.dataset.summaryStatus == 'pending' || this.dataset.summaryStatus == 'processing']"
     hx-swap="outerHTML"
 >
     {% if summary.status.value == 'pending' %}
@@ -14,7 +14,7 @@
             <span class="text-yellow-600 font-medium">開始待ち...</span>
         </div>
         <p class="text-sm text-yellow-600 mt-2">
-            要約リクエストはキューに入っています。まもなく処理が開始されます。
+            LLM処理は順番待ちです。まもなく処理が開始されます。
         </p>
     </div>
 
@@ -22,7 +22,7 @@
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div class="flex items-center space-x-3">
             <div class="animate-spin h-5 w-5 border-2 border-primary-600 border-t-transparent rounded-full"></div>
-            <span class="text-primary-600 font-medium">要約を生成中...</span>
+            <span class="text-primary-600 font-medium">LLM処理中...</span>
         </div>
         <p class="text-sm text-blue-600 mt-2">
             LLMが文字起こしを処理しています。しばらくお待ちください。
@@ -31,11 +31,19 @@
 
     {% elif summary.status.value == 'completed' %}
     <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-        <div class="flex items-center space-x-3">
-            <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-            </svg>
-            <span class="text-green-600 font-medium">要約完了</span>
+        <div class="space-y-3">
+            <div class="flex items-center space-x-3">
+                <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-green-600 font-medium">LLM処理完了</span>
+            </div>
+            <p class="text-sm text-green-700">
+                LLM処理結果と保存操作を表示します。
+            </p>
+            <a href="/summary/job/{{ summary.id }}#summary-result-card" class="inline-block text-sm font-medium text-green-700 hover:text-green-800">
+                LLM処理結果を見る &rarr;
+            </a>
         </div>
     </div>
 
@@ -45,7 +53,7 @@
             <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
             </svg>
-            <span class="text-red-600 font-medium">要約失敗</span>
+            <span class="text-red-600 font-medium">LLM処理失敗</span>
         </div>
         {% if summary.error_message %}
         <p class="text-sm text-red-600 mt-2">

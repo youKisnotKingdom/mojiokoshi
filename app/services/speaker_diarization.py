@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 _speaker_diarization_pipelines: dict[str, Any] = {}
+MIN_DISPLAY_TURN_SECONDS = 1.2
 
 
 def _resolve_source() -> str:
@@ -95,6 +96,119 @@ def _segment_overlap(start: float, end: float, turn: dict[str, float | str]) -> 
     return max(0.0, min(end, float(turn["end"])) - max(start, float(turn["start"])))
 
 
+def _best_speaker(
+    start: float,
+    end: float,
+    speaker_turns: list[dict[str, float | str]],
+    fallback: str | None = None,
+) -> str | None:
+    best_turn = None
+    best_overlap = 0.0
+    nearest_turn = None
+    nearest_gap = float("inf")
+    for turn in speaker_turns:
+        overlap = _segment_overlap(start, end, turn)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_turn = turn
+        turn_start = float(turn["start"])
+        turn_end = float(turn["end"])
+        if end < turn_start:
+            gap = turn_start - end
+        elif start > turn_end:
+            gap = start - turn_end
+        else:
+            gap = 0.0
+        if gap < nearest_gap:
+            nearest_gap = gap
+            nearest_turn = turn
+
+    if best_turn is not None and best_overlap > 0:
+        return str(best_turn["speaker"])
+    if nearest_turn is not None and nearest_gap <= 1.0:
+        return str(nearest_turn["speaker"])
+    return fallback
+
+
+def _overlapping_turns(
+    start: float,
+    end: float,
+    speaker_turns: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    turns: list[dict[str, float | str]] = []
+    segment_duration = max(0.0, end - start)
+    min_turn_duration = min(
+        MIN_DISPLAY_TURN_SECONDS,
+        max(0.35, segment_duration * 0.04),
+    )
+    for turn in speaker_turns:
+        overlap_start = max(start, float(turn["start"]))
+        overlap_end = min(end, float(turn["end"]))
+        if overlap_end <= overlap_start:
+            continue
+        if overlap_end - overlap_start < min_turn_duration:
+            continue
+
+        speaker = str(turn["speaker"])
+        if turns and turns[-1]["speaker"] == speaker:
+            turns[-1]["end"] = overlap_end
+            continue
+
+        turns.append(
+            {
+                "speaker": speaker,
+                "start": overlap_start,
+                "end": overlap_end,
+            }
+        )
+    return turns
+
+
+def _split_text_by_turns(
+    text: str,
+    turns: list[dict[str, float | str]],
+) -> list[str]:
+    if len(turns) <= 1:
+        return [text]
+
+    text = text.strip()
+    if not text:
+        return ["" for _ in turns]
+
+    total_duration = sum(float(turn["end"]) - float(turn["start"]) for turn in turns)
+    if total_duration <= 0:
+        return [text] + ["" for _ in turns[1:]]
+
+    pieces: list[str] = []
+    cursor = 0
+    length = len(text)
+    for index, turn in enumerate(turns):
+        if index == len(turns) - 1:
+            pieces.append(text[cursor:].strip())
+            break
+
+        duration = float(turn["end"]) - float(turn["start"])
+        target = cursor + round((length - cursor) * duration / total_duration)
+        target = max(cursor + 1, min(length - 1, target))
+
+        # Prefer natural Japanese punctuation near the proportional split point.
+        search_start = max(cursor + 1, target - 12)
+        search_end = min(length - 1, target + 12)
+        punctuation = "。！？、,. "
+        candidates = [
+            pos + 1
+            for pos in range(search_start, search_end)
+            if text[pos] in punctuation
+        ]
+        if candidates:
+            target = min(candidates, key=lambda pos: abs(pos - target))
+
+        pieces.append(text[cursor:target].strip())
+        cursor = target
+
+    return pieces
+
+
 def assign_speakers_to_segments(
     segments: list[dict[str, Any]],
     speaker_turns: list[dict[str, float | str]],
@@ -109,20 +223,59 @@ def assign_speakers_to_segments(
     for segment in segments:
         start = float(segment.get("start", 0.0) or 0.0)
         end = float(segment.get("end", start) or start)
-        best_turn = None
-        best_overlap = 0.0
+        words = segment.get("words") or []
 
-        for turn in speaker_turns:
-            overlap = _segment_overlap(start, end, turn)
-            if overlap > best_overlap:
-                best_overlap = overlap
-                best_turn = turn
+        if isinstance(words, list) and len(words) > 1:
+            current_segment: dict[str, Any] | None = None
+            for word in words:
+                word_text = str(word.get("word", "")).strip()
+                if not word_text:
+                    continue
 
-        speaker = None
-        if best_turn is not None and best_overlap > 0:
-            speaker = str(best_turn["speaker"])
-        elif last_speaker is not None:
-            speaker = last_speaker
+                word_start = float(word.get("start", start) or start)
+                word_end = float(word.get("end", word_start) or word_start)
+                speaker = _best_speaker(word_start, word_end, speaker_turns, last_speaker)
+                if current_segment and current_segment.get("speaker") == speaker:
+                    current_segment["text"] = f"{current_segment['text']}{word_text}".strip()
+                    current_segment["end"] = word_end
+                    current_segment["words"].append(word)
+                    continue
+
+                if current_segment:
+                    labelled_segments.append(current_segment)
+
+                current_segment = {
+                    "text": word_text,
+                    "start": word_start,
+                    "end": word_end,
+                    "words": [word],
+                }
+                if speaker is not None:
+                    current_segment["speaker"] = speaker
+                    last_speaker = speaker
+
+            if current_segment:
+                labelled_segments.append(current_segment)
+            continue
+
+        turns = _overlapping_turns(start, end, speaker_turns)
+        text = str(segment.get("text", "")).strip()
+        if len(turns) > 1 and text:
+            pieces = _split_text_by_turns(text, turns)
+            for turn, piece in zip(turns, pieces):
+                if not piece:
+                    continue
+                labelled_segment = dict(segment)
+                labelled_segment["text"] = piece
+                labelled_segment["start"] = float(turn["start"])
+                labelled_segment["end"] = float(turn["end"])
+                labelled_segment["speaker"] = str(turn["speaker"])
+                labelled_segment["words"] = []
+                labelled_segments.append(labelled_segment)
+                last_speaker = str(turn["speaker"])
+            continue
+
+        speaker = _best_speaker(start, end, speaker_turns, last_speaker)
 
         labelled_segment = dict(segment)
         if speaker is not None:

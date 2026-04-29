@@ -1,9 +1,13 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from app.models.transcription import TranscriptionEngine, TranscriptionStatus
+from app.models.transcription import (
+    SpeakerDiarizationStatus,
+    TranscriptionEngine,
+    TranscriptionStatus,
+)
 from app.schemas.audio import AudioFileResponse
 
 
@@ -16,6 +20,8 @@ class TranscriptionJobCreate(BaseModel):
 
 
 class TranscriptionJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     audio_file_id: uuid.UUID
     user_id: int
@@ -24,6 +30,10 @@ class TranscriptionJobResponse(BaseModel):
     model_size: str
     language: str | None
     enable_speaker_diarization: bool
+    speaker_diarization_status: SpeakerDiarizationStatus
+    speaker_diarization_error: str | None
+    speaker_diarization_started_at: datetime | None
+    speaker_diarization_completed_at: datetime | None
     result_text: str | None
     progress_percent: float
     error_message: str | None
@@ -34,16 +44,12 @@ class TranscriptionJobResponse(BaseModel):
     is_failed: bool
     duration_display: str
 
-    class Config:
-        from_attributes = True
-
 
 class TranscriptionJobDetail(TranscriptionJobResponse):
+    model_config = ConfigDict(from_attributes=True)
+
     audio_file: AudioFileResponse
     result_segments: dict | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class TranscriptionProgressResponse(BaseModel):

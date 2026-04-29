@@ -54,7 +54,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
         </svg>
         <h3 class="mt-4 text-lg font-medium text-gray-900">プロンプトテンプレートがありません</h3>
-        <p class="mt-2 text-gray-500">要約にはデフォルトのプロンプトが使用されます。</p>
+        <p class="mt-2 text-gray-500">LLM処理には標準プロンプトが使用されます。</p>
     </div>
     {% endif %}
 </div>
@@ -80,7 +80,10 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">ユーザープロンプトテンプレート</label>
-                    <textarea name="user_prompt_template" rows="4" required class="form-input mt-1" placeholder="文字起こしテキストのプレースホルダーとして {text} を使用してください"></textarea>
+                    <textarea name="user_prompt_template" rows="6" required class="form-input mt-1" placeholder="推奨本文は {text}、本文整形後は {refined_text}、生文字起こしは {raw_text} を使用できます"></textarea>
+                    <p class="mt-1 text-xs text-gray-500">
+                        利用可能な変数: {text}, {raw_text}, {refined_text}, {speaker_text}, {filename}, {engine}, {model_size}, {language}, {duration}, {duration_seconds}, {speaker_diarization}
+                    </p>
                 </div>
                 {% if current_user.is_admin %}
                 <label class="flex items-center space-x-2 text-sm text-gray-700">

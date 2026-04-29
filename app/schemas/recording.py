@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.recording import RecordingStatus
 
@@ -11,6 +11,8 @@ class RecordingSessionCreate(BaseModel):
 
 
 class RecordingSessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     user_id: int
     status: RecordingStatus
@@ -22,20 +24,16 @@ class RecordingSessionResponse(BaseModel):
     paused_at: datetime | None
     completed_at: datetime | None
 
-    class Config:
-        from_attributes = True
-
 
 class RecordingChunkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     session_id: uuid.UUID
     chunk_index: int
     file_size: int
     duration_seconds: float
     received_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # WebSocket message types

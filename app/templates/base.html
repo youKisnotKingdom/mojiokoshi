@@ -13,15 +13,12 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold text-primary-600">
+                    <a href="/transcription/upload" class="text-xl font-bold text-primary-600">
                         Mojiokoshi
                     </a>
                     {% if current_user %}
                     <div class="hidden md:flex ml-10 space-x-4">
-                        <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                            ホーム
-                        </a>
-                        <a href="/transcription" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                        <a href="/transcription/upload" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
                             文字起こし
                         </a>
                         <a href="/history" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
@@ -68,7 +65,7 @@
     <footer class="bg-white border-t border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <p class="text-center text-gray-500 text-sm">
-                Mojiokoshi - 文字起こし＆要約
+                Mojiokoshi - 文字起こし＆LLM処理
             </p>
         </div>
     </footer>

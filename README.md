@@ -116,6 +116,8 @@ ALLOWED_HOSTS=localhost,127.0.0.1,<server-ip>
 # LLM server on your local network
 LLM_API_BASE_URL=http://<llm-server-ip>:8080/v1
 LLM_MODEL_NAME=your-model-name
+LLM_MAX_TOKENS=8192
+LLM_TIMEOUT=300
 
 # Batch transcription defaults
 DEFAULT_TRANSCRIPTION_ENGINE=parakeet_ja
@@ -173,19 +175,75 @@ Recommended production profile:
 - Do not treat `worker=3` as a normal setting on this `16GB` GPU
 - Keep other GPU-heavy services such as `open-webui` off the same host or stopped during batch-heavy periods
 
+### OpenLDAP Authentication
+
+This app does not run an LDAP server. Point `LDAP_SERVER_URI` at an existing
+OpenLDAP server on the internal network.
+
+Local 6-digit users remain available. When OpenLDAP is enabled, users can log in
+with their LDAP ID; the app creates a linked local user on first successful login
+so existing ownership, history, and permissions continue to use the internal user
+table.
+
+```env
+LDAP_ENABLED=true
+LDAP_SERVER_URI=ldap://ldap.example.local:389
+LDAP_BIND_DN=cn=readonly,dc=example,dc=local
+LDAP_BIND_PASSWORD=...
+LDAP_USER_BASE_DN=ou=people,dc=example,dc=local
+LDAP_USER_FILTER=(uid={username})
+LDAP_USER_ID_ATTRIBUTE=uid
+LDAP_DISPLAY_NAME_ATTRIBUTE=cn
+LDAP_START_TLS=false
+LDAP_DEFAULT_ROLE=user
+```
+
+Optional admin group mapping:
+
+```env
+LDAP_GROUP_BASE_DN=ou=groups,dc=example,dc=local
+LDAP_GROUP_FILTER=(member={user_dn})
+LDAP_ADMIN_GROUP_DN=cn=mojiokoshi-admins,ou=groups,dc=example,dc=local
+```
+
+If LDAP is disabled, the login screen only accepts the existing 6-digit user ID.
+If LDAP is enabled, the same field accepts either a local 6-digit user ID or an
+LDAP ID.
+
 ### Offline Speaker Diarization Model
 
 Speaker diarization is designed for offline deployment, but the `pyannote` model
 itself should be prepared once on a connected machine and then mounted into the app.
 
-Recommended runtime settings:
+Speaker diarization is kept as an optional post-processing path. It is disabled
+for normal operation because it consumes GPU/CPU time, can delay queued work, and
+its labels are not always accurate enough to justify running it for every file.
+
+Normal production settings:
+
+```env
+ENABLE_SPEAKER_DIARIZATION=false
+```
+
+When speaker labels are explicitly needed, enable the feature and start the
+dedicated profile:
 
 ```env
 ENABLE_SPEAKER_DIARIZATION=true
 SPEAKER_DIARIZATION_MODEL_PATH=/app/models/pyannote/speaker-diarization-community-1
-SPEAKER_DIARIZATION_DEVICE=cpu
+SPEAKER_DIARIZATION_DEVICE=auto
+DIARIZATION_WORKER_CONCURRENCY=1
 HUGGINGFACE_TOKEN=
 ```
+
+```bash
+docker compose --profile diarization up -d diarization-worker
+```
+
+Speaker diarization runs as a post-ASR job. The plain transcript is completed first
+and can be used by LLM processing immediately; speaker labels are attached later by
+`diarization-worker`. This avoids blocking the main transcription result at `99%`
+for long recordings and keeps LLM result provenance clear.
 
 Preparation flow:
 
@@ -219,6 +277,8 @@ At runtime, if `SPEAKER_DIARIZATION_MODEL_PATH` exists, the app does not fetch f
 | `DATABASE_URL` | - | PostgreSQL connection URL |
 | `LLM_API_BASE_URL` | - | Local LLM server URL |
 | `LLM_MODEL_NAME` | default | Model name for summarization |
+| `LLM_MAX_TOKENS` | 8192 | Max output tokens for final LLM processing |
+| `LLM_TIMEOUT` | 300 | LLM request timeout in seconds |
 | `DEFAULT_TRANSCRIPTION_ENGINE` | parakeet_ja | Default batch transcription engine |
 | `WHISPER_MODEL_SIZE` | medium | faster-whisper fallback / checker model size |
 | `WEB_WHISPER_DEVICE` | cpu | Device used by `web` in Docker |
@@ -226,7 +286,14 @@ At runtime, if `SPEAKER_DIARIZATION_MODEL_PATH` exists, the app does not fetch f
 | `CHECKER_WHISPER_DEVICE` | cpu | Device used by checker demo in Docker |
 | `ENABLE_REALTIME_TRANSCRIPTION` | false | Show browser recording UI |
 | `WORKER_TRANSCRIPTION_CONCURRENCY` | 1 | Claimed transcription jobs per worker process |
+| `WORKER_CHUNK_REFINEMENT_CONCURRENCY` | 1 | Claimed chunk-level LLM refinement jobs per worker process |
 | `WORKER_SUMMARY_CONCURRENCY` | 1 | Claimed summary jobs per worker process |
+| `ENABLE_CHUNK_LLM_REFINEMENT` | true | Persist ASR chunks and clean up each chunk with the LLM before final LLM processing |
+| `LLM_CHUNK_REFINEMENT_MAX_INPUT_CHARS` | 12000 | Max characters sent to the LLM for one ASR chunk |
+| `LLM_CHUNK_REFINEMENT_MAX_OUTPUT_TOKENS` | 2000 | Max output tokens for one chunk refinement |
+| `LLM_CHUNK_REFINEMENT_CONTEXT_CHARS` | 1000 | Previous chunk context characters included for continuity |
+| `LLM_WORKER_CHUNK_REFINEMENT_CONCURRENCY` | 2 | Chunk refinement concurrency for the `llm-worker` service |
+| `LLM_WORKER_SUMMARY_CONCURRENCY` | 1 | Final LLM processing concurrency for the `llm-worker` service |
 | `AUDIO_RETENTION_DAYS` | 30 | Days to keep audio files |
 | `MAX_UPLOAD_SIZE` | 1073741824 | Max upload size in bytes (Docker default: 1GB) |
 | `NGINX_CLIENT_MAX_BODY_SIZE` | 1g | nginx upload limit for HTTPS overlay |

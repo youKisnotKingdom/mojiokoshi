@@ -76,3 +76,22 @@ benchmark_datasets/
 benchmarks/
 hf_cache_canary_http/
 hf_cache_user/
+benchmark_logs/
+
+# Local ad hoc audio / benchmark outputs
+.codex
+sample_voice.m4a
+benchmark_runs/ad_hoc_*/
+benchmark_runs/utokyo_matrix_aligned_*/
+benchmark_runs/noise_robustness/assets/
+benchmark_runs/noise_robustness/fleurs_subset20/noisy_audio/
+benchmark_runs/**/*.wav
+benchmark_runs/**/*.mp3
+benchmark_runs/**/*.seconds
+benchmark_runs/**/report.json
+benchmark_runs/**/summary.json
+benchmark_runs/**/transcript.txt
+benchmark_runs/**/hypothesis.txt
+benchmark_runs/**/predictions.jsonl
+benchmark_runs/ops_worker_runtime_*.json
+benchmark_runs/summary_report.md

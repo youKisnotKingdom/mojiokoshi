@@ -17,20 +17,28 @@
         <form method="POST" action="/auth/login" class="space-y-6">
             <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
             <div>
-                <label for="user_id" class="label">ユーザーID</label>
+                <label for="user_id" class="label">
+                    {% if ldap_enabled %}ユーザーID / LDAP ID{% else %}ユーザーID{% endif %}
+                </label>
                 <input
                     type="text"
                     id="user_id"
                     name="user_id"
                     class="input"
-                    placeholder="6桁のIDを入力"
+                    placeholder="{% if ldap_enabled %}ユーザーIDまたはLDAP IDを入力{% else %}6桁のIDを入力{% endif %}"
+                    {% if not ldap_enabled %}
                     pattern="\d{6}"
                     maxlength="6"
+                    {% else %}
+                    maxlength="255"
+                    {% endif %}
                     value="{{ user_id or '' }}"
                     required
                     autofocus
                 />
+                {% if not ldap_enabled %}
                 <p class="text-xs text-gray-500 mt-1">6桁の数字</p>
+                {% endif %}
             </div>
 
             <div>

@@ -28,7 +28,13 @@ def _resolve_model_size(engine: TranscriptionEngine, model_size: str | None) -> 
     return settings.whisper_model_size
 
 
-def _create_jobs(audio_path: str, jobs: int, engine: TranscriptionEngine, model_size: str) -> tuple[list[str], list[str]]:
+def _create_jobs(
+    audio_path: str,
+    jobs: int,
+    engine: TranscriptionEngine,
+    model_size: str,
+    enable_speaker_diarization: bool,
+) -> tuple[list[str], list[str]]:
     db = SessionLocal()
     audio_ids: list[str] = []
     job_ids: list[str] = []
@@ -59,6 +65,7 @@ def _create_jobs(audio_path: str, jobs: int, engine: TranscriptionEngine, model_
                 engine=engine,
                 model_size=model_size,
                 progress_percent=0.0,
+                enable_speaker_diarization=enable_speaker_diarization,
                 created_at=now,
             )
             db.add(job)
@@ -96,6 +103,14 @@ def _fetch_jobs(job_ids: list[str]) -> list[dict]:
                     "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                     "error_message": job.error_message,
                     "result_text_length": len(job.result_text or ""),
+                    "enable_speaker_diarization": job.enable_speaker_diarization,
+                    "speaker_count": len(
+                        {
+                            segment.get("speaker")
+                            for segment in (job.result_segments or [])
+                            if isinstance(segment, dict) and segment.get("speaker")
+                        }
+                    ),
                 }
             )
         return result
@@ -112,12 +127,19 @@ def main() -> None:
     parser.add_argument("--poll-interval", type=float, default=0.5)
     parser.add_argument("--timeout", type=float, default=300.0)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--speaker-diarization", action="store_true")
     args = parser.parse_args()
 
     engine = TranscriptionEngine(args.engine)
     model_size = _resolve_model_size(engine, args.model_size)
 
-    audio_ids, job_ids = _create_jobs(args.audio, args.jobs, engine, model_size)
+    audio_ids, job_ids = _create_jobs(
+        args.audio,
+        args.jobs,
+        engine,
+        model_size,
+        args.speaker_diarization,
+    )
     try:
         started = time.perf_counter()
         deadline = started + args.timeout
@@ -150,6 +172,9 @@ def main() -> None:
                 "whisper_device": settings.whisper_device,
                 "engine": engine.value,
                 "model_size": model_size,
+                "speaker_diarization": args.speaker_diarization,
+                "enable_speaker_diarization": settings.enable_speaker_diarization,
+                "speaker_diarization_device": settings.speaker_diarization_device,
             },
             "jobs": jobs,
         }

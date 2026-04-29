@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.config import get_settings
 from app.dependencies import (
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
@@ -20,6 +21,7 @@ from app.services import auth as auth_service
 from app.templating import templates
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -29,11 +31,15 @@ async def login_page(
 ):
     """Show login page."""
     if user:
-        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url="/transcription/upload", status_code=status.HTTP_302_FOUND)
 
     return templates.TemplateResponse(
         "auth/login.html",
-        {"request": request, "title": "ログイン"},
+        {
+            "request": request,
+            "title": "ログイン",
+            "ldap_enabled": settings.ldap_enabled,
+        },
     )
 
 
@@ -48,9 +54,16 @@ async def login(
 ):
     """Process login form."""
     if not verify_csrf_token(csrf_token):
-        raise HTTPException(
+        return templates.TemplateResponse(
+            "auth/login.html",
+            {
+                "request": request,
+                "title": "ログイン",
+                "error": "CSRFトークンが無効です。ログイン画面を再読み込みして再試行してください。",
+                "user_id": user_id,
+                "ldap_enabled": settings.ldap_enabled,
+            },
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRFトークンが無効です",
         )
 
     user = auth_service.authenticate_user(db, user_id, password)
@@ -63,12 +76,13 @@ async def login(
                 "title": "ログイン",
                 "error": "ユーザーIDまたはパスワードが正しくありません",
                 "user_id": user_id,
+                "ldap_enabled": settings.ldap_enabled,
             },
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
     # Create session and redirect
-    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    response = RedirectResponse(url="/transcription/upload", status_code=status.HTTP_302_FOUND)
     session_token = create_session_token(user.id)
     secure_cookie = request.url.scheme == "https"
     response.set_cookie(

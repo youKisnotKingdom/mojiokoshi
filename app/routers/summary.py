@@ -1,11 +1,10 @@
-"""
-Summary router for managing summarization jobs.
-"""
+"""Router for managing LLM post-processing jobs."""
 import uuid
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -26,6 +25,12 @@ from app.templating import templates
 
 settings = get_settings()
 router = APIRouter(prefix="/summary", tags=["summary"])
+
+
+def _attachment_headers(filename: str) -> dict[str, str]:
+    return {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+    }
 
 
 @router.get("/templates", response_class=HTMLResponse)
@@ -61,23 +66,70 @@ async def summary_detail_page(
     """Summary detail page."""
     stmt = (
         select(Summary)
-        .options(joinedload(Summary.transcription_job))
+        .options(
+            joinedload(Summary.transcription_job).joinedload(TranscriptionJob.audio_file),
+            joinedload(Summary.prompt_template),
+        )
         .where(Summary.id == job_id)
         .where(Summary.user_id == current_user.id)
     )
     summary = db.execute(stmt).unique().scalar_one_or_none()
 
     if not summary:
-        raise HTTPException(status_code=404, detail="要約が見つかりません")
+        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
 
     return templates.TemplateResponse(
         "summary/detail.html",
         {
             "request": request,
-            "title": "要約",
+            "title": "LLM処理",
             "current_user": current_user,
             "summary": summary,
         },
+    )
+
+
+@router.get("/job/{job_id}/download/{export_format}")
+async def download_summary_result(
+    job_id: uuid.UUID,
+    export_format: str,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Download a completed LLM processing result as Markdown/text."""
+    stmt = (
+        select(Summary)
+        .options(joinedload(Summary.transcription_job).joinedload(TranscriptionJob.audio_file))
+        .where(Summary.id == job_id)
+        .where(Summary.user_id == current_user.id)
+    )
+    summary = db.execute(stmt).unique().scalar_one_or_none()
+    if not summary:
+        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
+    if summary.status != SummaryStatus.COMPLETED or not summary.result_text:
+        raise HTTPException(status_code=400, detail="LLM処理が完了していません")
+
+    source_name = "summary"
+    if summary.transcription_job and summary.transcription_job.audio_file:
+        source_name = summary.transcription_job.audio_file.original_filename
+    stem = source_name.rsplit(".", 1)[0] if "." in source_name else source_name
+    stem = "".join(char if char.isalnum() or char in "._-" else "_" for char in stem).strip("._-")
+    if not stem:
+        stem = "summary"
+
+    if export_format == "md":
+        filename = f"{stem}-{str(summary.id)[:8]}-llm.md"
+        media_type = "text/markdown; charset=utf-8"
+    elif export_format == "txt":
+        filename = f"{stem}-{str(summary.id)[:8]}-llm.txt"
+        media_type = "text/plain; charset=utf-8"
+    else:
+        raise HTTPException(status_code=404, detail="未対応のダウンロード形式です")
+
+    return Response(
+        content=summary.result_text,
+        media_type=media_type,
+        headers=_attachment_headers(filename),
     )
 
 
@@ -88,7 +140,7 @@ async def create_summary(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Create a new summary for a transcription job."""
+    """Create a new LLM processing job for a transcription job."""
     # Verify transcription exists and is completed
     stmt = (
         select(TranscriptionJob)
@@ -103,13 +155,16 @@ async def create_summary(
     if transcription.status != TranscriptionStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="文字起こしが完了していません")
 
-    # Create summary
-    summary = await summarization.create_summary_for_transcription(
-        db,
-        transcription,
-        prompt_template_id=data.prompt_template_id,
-        model_name=data.model_name,
-    )
+    # Create LLM processing job
+    try:
+        summary = await summarization.create_summary_for_transcription(
+            db,
+            transcription,
+            prompt_template_id=data.prompt_template_id,
+            model_name=data.model_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return SummaryResponse.model_validate(summary)
 
@@ -120,9 +175,9 @@ async def summarize_transcription(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     csrf_token: Annotated[str, Form()] = "",
-    prompt_template_id: int | None = None,
+    prompt_template_id: Annotated[str | None, Form()] = None,
 ):
-    """Create a summary for a transcription (HTMX endpoint)."""
+    """Create an LLM processing job for a transcription."""
     if not verify_csrf_token(csrf_token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRFトークンが無効です")
     # Verify transcription exists and is completed
@@ -139,14 +194,21 @@ async def summarize_transcription(
     if transcription.status != TranscriptionStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="文字起こしが完了していません")
 
-    # Create summary
-    summary = await summarization.create_summary_for_transcription(
-        db,
-        transcription,
-        prompt_template_id=prompt_template_id,
-    )
+    try:
+        parsed_prompt_template_id = int(prompt_template_id) if prompt_template_id else None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="プロンプトテンプレートIDが不正です") from exc
 
-    # Redirect to summary page
+    try:
+        summary = await summarization.create_summary_for_transcription(
+            db,
+            transcription,
+            prompt_template_id=parsed_prompt_template_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Redirect to LLM processing result page
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"/summary/job/{summary.id}", status_code=303)
 
@@ -157,7 +219,7 @@ async def get_summary(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Get a summary by ID."""
+    """Get an LLM processing job by ID."""
     stmt = (
         select(Summary)
         .where(Summary.id == job_id)
@@ -166,7 +228,7 @@ async def get_summary(
     summary = db.execute(stmt).scalar_one_or_none()
 
     if not summary:
-        raise HTTPException(status_code=404, detail="要約が見つかりません")
+        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
 
     return SummaryResponse.model_validate(summary)
 
@@ -178,7 +240,7 @@ async def summary_progress_partial(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """HTMX partial for summary progress."""
+    """HTMX partial for LLM processing progress."""
     stmt = (
         select(Summary)
         .where(Summary.id == job_id)
@@ -187,7 +249,7 @@ async def summary_progress_partial(
     summary = db.execute(stmt).scalar_one_or_none()
 
     if not summary:
-        raise HTTPException(status_code=404, detail="要約が見つかりません")
+        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
 
     return templates.TemplateResponse(
         "summary/partials/progress.html",

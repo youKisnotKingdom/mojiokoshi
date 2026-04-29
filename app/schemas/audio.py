@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.audio import AudioSource
 
@@ -16,6 +16,8 @@ class AudioFileCreate(AudioFileBase):
 
 
 class AudioFileResponse(AudioFileBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     user_id: int
     stored_filename: str
@@ -26,6 +28,3 @@ class AudioFileResponse(AudioFileBase):
     created_at: datetime
     expires_at: datetime | None
     is_deleted: bool
-
-    class Config:
-        from_attributes = True

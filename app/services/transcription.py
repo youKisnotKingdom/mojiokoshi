@@ -12,7 +12,12 @@ from typing import Callable, Generator, Optional
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import TranscriptionEngine, TranscriptionJob, TranscriptionStatus
+from app.models import (
+    SpeakerDiarizationStatus,
+    TranscriptionEngine,
+    TranscriptionJob,
+    TranscriptionStatus,
+)
 import app.services.speaker_diarization as speaker_diarization_service
 from app.time_utils import utc_now
 
@@ -109,6 +114,24 @@ def _ffprobe_duration(audio_path: Path) -> float:
     return float(result.stdout.strip())
 
 
+def _ensure_audio_duration(db: Session, job: TranscriptionJob, audio_path: Path) -> float:
+    """Ensure uploaded files also get duration metadata for progress updates."""
+    if job.audio_file and job.audio_file.duration_seconds:
+        return float(job.audio_file.duration_seconds)
+
+    try:
+        duration = _ffprobe_duration(audio_path)
+    except Exception as exc:
+        logger.warning("Failed to probe audio duration for job %s: %s", job.id, exc)
+        return 0.0
+
+    if job.audio_file:
+        job.audio_file.duration_seconds = duration
+    job.progress_percent = max(float(job.progress_percent or 0.0), 1.0)
+    db.commit()
+    return duration
+
+
 def _normalize_audio_for_parakeet(source: Path, output_path: Path) -> Path:
     _run_media_command(
         [
@@ -156,6 +179,31 @@ def _split_audio_for_parakeet(source: Path, output_dir: Path) -> list[Path]:
     if not chunks:
         raise RuntimeError("Parakeet chunking failed: no chunks were created")
     return chunks
+
+
+def _parakeet_timestamp_text(entry: dict) -> str:
+    if "word" in entry:
+        return str(entry.get("word", ""))
+    value = entry.get("char", "")
+    if isinstance(value, list):
+        return "".join(str(item) for item in value)
+    return str(value)
+
+
+def _parakeet_timestamp_units(entries: list[dict], chunk_offset: float) -> list[dict]:
+    units = []
+    for entry in entries:
+        text = _parakeet_timestamp_text(entry)
+        if not text:
+            continue
+        units.append(
+            {
+                "word": text,
+                "start": chunk_offset + float(entry.get("start", 0.0) or 0.0),
+                "end": chunk_offset + float(entry.get("end", 0.0) or 0.0),
+            }
+        )
+    return units
 
 
 def transcribe_audio_sync(
@@ -231,7 +279,7 @@ def transcribe_audio_parakeet_sync(
         chunks = _split_audio_for_parakeet(normalized_path, chunks_dir)
 
         chunk_offset = 0.0
-        for chunk_path in chunks:
+        for chunk_index, chunk_path in enumerate(chunks):
             result = model.transcribe(
                 [str(chunk_path)],
                 batch_size=1,
@@ -241,8 +289,12 @@ def transcribe_audio_parakeet_sync(
             )
             item = result[0]
             chunk_duration = _ffprobe_duration(chunk_path)
+            chunk_start = chunk_offset
+            chunk_end = chunk_offset + chunk_duration
             timestamps = getattr(item, "timestamp", None) or getattr(item, "timestep", None) or {}
             words = timestamps.get("word") or []
+            chars = timestamps.get("char") or []
+            timestamp_units = words if len(words) > 1 else chars
             segment_entries = timestamps.get("segment") or []
 
             if segment_entries:
@@ -254,13 +306,16 @@ def transcribe_audio_parakeet_sync(
                     segment_start = chunk_offset + float(segment.get("start", 0.0) or 0.0)
                     segment_end = chunk_offset + float(segment.get("end", 0.0) or 0.0)
                     segment_words = []
-                    for word in words:
-                        word_start = chunk_offset + float(word.get("start", 0.0) or 0.0)
-                        word_end = chunk_offset + float(word.get("end", 0.0) or 0.0)
+                    for unit in timestamp_units:
+                        unit_text = _parakeet_timestamp_text(unit)
+                        if not unit_text:
+                            continue
+                        word_start = chunk_offset + float(unit.get("start", 0.0) or 0.0)
+                        word_end = chunk_offset + float(unit.get("end", 0.0) or 0.0)
                         if word_end > segment_start and word_start < segment_end:
                             segment_words.append(
                                 {
-                                    "word": str(word.get("word", "")),
+                                    "word": unit_text,
                                     "start": word_start,
                                     "end": word_end,
                                 }
@@ -270,6 +325,9 @@ def transcribe_audio_parakeet_sync(
                         "text": text,
                         "start": segment_start,
                         "end": segment_end,
+                        "chunk_index": chunk_index,
+                        "chunk_start": chunk_start,
+                        "chunk_end": chunk_end,
                         "words": segment_words,
                         "language": language,
                     }
@@ -277,16 +335,12 @@ def transcribe_audio_parakeet_sync(
                 text = getattr(item, "text", str(item)).strip()
                 yield {
                     "text": text,
-                    "start": chunk_offset,
-                    "end": chunk_offset + chunk_duration,
-                    "words": [
-                        {
-                            "word": str(word.get("word", "")),
-                            "start": chunk_offset + float(word.get("start", 0.0) or 0.0),
-                            "end": chunk_offset + float(word.get("end", 0.0) or 0.0),
-                        }
-                        for word in words
-                    ],
+                    "start": chunk_start,
+                    "end": chunk_end,
+                    "chunk_index": chunk_index,
+                    "chunk_start": chunk_start,
+                    "chunk_end": chunk_end,
+                    "words": _parakeet_timestamp_units(timestamp_units, chunk_offset),
                     "language": language,
                 }
             chunk_offset += chunk_duration
@@ -437,20 +491,73 @@ async def process_transcription_job(
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         model_size = job.model_size or settings.whisper_model_size
-        language = job.language or settings.whisper_language
+        language = job.language
         device = settings.whisper_device
 
         logger.info(f"Starting transcription job {job.id}: {audio_path}")
 
         segments = []
         full_text = []
-        total_duration = job.audio_file.duration_seconds or 0
+        total_duration = _ensure_audio_duration(db, job, Path(audio_path))
+        current_chunk_index: int | None = None
+        current_chunk_segments: list[dict] = []
 
-        for segment in transcribe_batch_job_sync(job.engine, audio_path, model_size, language, device):
+        def _segment_chunk_index(segment: dict, fallback_index: int) -> int:
+            if segment.get("chunk_index") is not None:
+                return int(segment["chunk_index"])
+            chunk_seconds = max(1, int(settings.parakeet_chunk_seconds or 300))
+            try:
+                return int(float(segment.get("start", 0.0) or 0.0) // chunk_seconds)
+            except (TypeError, ValueError):
+                return fallback_index
+
+        def _save_current_chunk(chunk_index: int | None, chunk_segments: list[dict]) -> None:
+            if chunk_index is None or not chunk_segments:
+                return
+            from app.services import summarization
+
+            raw_text = " ".join(
+                str(segment.get("text", "")).strip()
+                for segment in chunk_segments
+                if str(segment.get("text", "")).strip()
+            ).strip()
+            if not raw_text:
+                return
+
+            start_values = [
+                float(segment.get("chunk_start", segment.get("start", 0.0)) or 0.0)
+                for segment in chunk_segments
+            ]
+            end_values = [
+                float(segment.get("chunk_end", segment.get("end", 0.0)) or 0.0)
+                for segment in chunk_segments
+            ]
+            summarization.create_or_update_transcription_chunk(
+                db,
+                job,
+                chunk_index=chunk_index,
+                start_seconds=min(start_values) if start_values else 0.0,
+                end_seconds=max(end_values) if end_values else 0.0,
+                raw_text=raw_text,
+                raw_segments=chunk_segments,
+            )
+
+        for segment_index, segment in enumerate(
+            transcribe_batch_job_sync(job.engine, audio_path, model_size, language, device)
+        ):
+            segment_chunk_index = _segment_chunk_index(segment, segment_index)
+            if current_chunk_index is None:
+                current_chunk_index = segment_chunk_index
+            elif segment_chunk_index != current_chunk_index:
+                _save_current_chunk(current_chunk_index, current_chunk_segments)
+                current_chunk_segments = []
+                current_chunk_index = segment_chunk_index
+
             segments.append(segment)
+            current_chunk_segments.append(segment)
             full_text.append(segment["text"])
 
-            if total_duration > 0 and progress_callback:
+            if total_duration > 0:
                 segment_end = segment.get("end")
                 if segment_end is None:
                     progress = 99.0
@@ -458,25 +565,32 @@ async def process_transcription_job(
                     progress = min(99.0, (segment_end / total_duration) * 100)
                 job.progress_percent = progress
                 db.commit()
+                if progress_callback:
+                    progress_callback(job)
                 await asyncio.sleep(0)
 
-        if settings.enable_speaker_diarization and job.enable_speaker_diarization:
-            try:
-                speaker_turns = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: speaker_diarization_service.diarize_audio(audio_path)
-                )
-                segments = speaker_diarization_service.assign_speakers_to_segments(
-                    segments, speaker_turns
-                )
-            except Exception as exc:
-                logger.warning("Speaker diarization failed for job %s: %s", job.id, exc)
+        _save_current_chunk(current_chunk_index, current_chunk_segments)
 
         job.result_text = " ".join(full_text)
         job.result_segments = segments
         job.status = TranscriptionStatus.COMPLETED
         job.progress_percent = 100.0
         job.completed_at = utc_now()
+        if settings.enable_speaker_diarization and job.enable_speaker_diarization:
+            job.speaker_diarization_status = SpeakerDiarizationStatus.PENDING
+            job.speaker_diarization_error = None
+            job.speaker_diarization_started_at = None
+            job.speaker_diarization_completed_at = None
+        else:
+            job.speaker_diarization_status = SpeakerDiarizationStatus.NOT_REQUESTED
         db.commit()
+
+        try:
+            from app.services import summarization
+
+            summarization.enqueue_auto_llm_jobs_for_transcription(db, job)
+        except Exception as exc:
+            logger.warning("Automatic LLM processing enqueue failed for job %s: %s", job.id, exc)
 
         logger.info(f"Completed transcription job {job.id}")
         return True
@@ -486,6 +600,150 @@ async def process_transcription_job(
         job.status = TranscriptionStatus.FAILED
         job.error_message = str(e)
         job.completed_at = utc_now()
+        db.commit()
+        return False
+
+
+def claim_pending_speaker_diarization_jobs(db: Session, limit: int = 1) -> list[uuid.UUID]:
+    """Claim completed transcription jobs that still need speaker diarization."""
+    from sqlalchemy import select
+
+    stmt = (
+        select(TranscriptionJob)
+        .where(TranscriptionJob.status == TranscriptionStatus.COMPLETED)
+        .where(TranscriptionJob.enable_speaker_diarization.is_(True))
+        .where(TranscriptionJob.speaker_diarization_status == SpeakerDiarizationStatus.PENDING)
+        .where(TranscriptionJob.result_text.is_not(None))
+        .order_by(TranscriptionJob.completed_at, TranscriptionJob.created_at)
+        .with_for_update(skip_locked=True)
+        .limit(limit)
+    )
+    jobs = list(db.execute(stmt).scalars().all())
+    if not jobs:
+        return []
+
+    now = utc_now()
+    claimed_ids: list[uuid.UUID] = []
+    for job in jobs:
+        job.speaker_diarization_status = SpeakerDiarizationStatus.PROCESSING
+        job.speaker_diarization_started_at = now
+        job.speaker_diarization_completed_at = None
+        job.speaker_diarization_error = None
+        claimed_ids.append(job.id)
+
+    db.commit()
+    return claimed_ids
+
+
+def requeue_stale_speaker_diarization_jobs(db: Session, stale_after_seconds: int) -> list[uuid.UUID]:
+    """Return long-stuck speaker diarization jobs back to pending."""
+    if stale_after_seconds <= 0:
+        return []
+
+    from sqlalchemy import select
+
+    cutoff = utc_now() - timedelta(seconds=stale_after_seconds)
+    stmt = (
+        select(TranscriptionJob)
+        .where(TranscriptionJob.speaker_diarization_status == SpeakerDiarizationStatus.PROCESSING)
+        .where(TranscriptionJob.speaker_diarization_started_at.is_not(None))
+        .where(TranscriptionJob.speaker_diarization_started_at < cutoff)
+        .with_for_update(skip_locked=True)
+    )
+    jobs = list(db.execute(stmt).scalars().all())
+    if not jobs:
+        return []
+
+    now = utc_now()
+    recovered_ids: list[uuid.UUID] = []
+    for job in jobs:
+        job.speaker_diarization_status = SpeakerDiarizationStatus.PENDING
+        job.speaker_diarization_started_at = None
+        job.speaker_diarization_completed_at = None
+        message = (
+            f"Recovered from stale speaker diarization state at {now.isoformat()} "
+            f"after exceeding {stale_after_seconds}s timeout."
+        )
+        job.speaker_diarization_error = (
+            f"{job.speaker_diarization_error}\n{message}"
+            if job.speaker_diarization_error
+            else message
+        )
+        recovered_ids.append(job.id)
+
+    db.commit()
+    logger.warning(
+        "Re-queued %d stale speaker diarization job(s): %s",
+        len(recovered_ids),
+        ", ".join(str(job_id) for job_id in recovered_ids),
+    )
+    return recovered_ids
+
+
+async def process_speaker_diarization_job_by_id(job_id: uuid.UUID) -> bool:
+    """Process a claimed speaker diarization job in its own DB session."""
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        job = load_job_for_processing(db, job_id)
+        if not job:
+            logger.error("Claimed speaker diarization job not found: %s", job_id)
+            return False
+        return await process_speaker_diarization_job(db, job)
+    finally:
+        db.close()
+
+
+async def process_speaker_diarization_job(db: Session, job: TranscriptionJob) -> bool:
+    """Attach speaker labels to a completed ASR result without blocking ASR completion."""
+    try:
+        if job.status != TranscriptionStatus.COMPLETED:
+            raise ValueError("speaker diarization requires a completed transcription job")
+        if not job.enable_speaker_diarization:
+            job.speaker_diarization_status = SpeakerDiarizationStatus.NOT_REQUESTED
+            job.speaker_diarization_completed_at = utc_now()
+            db.commit()
+            return True
+        if not settings.enable_speaker_diarization:
+            raise RuntimeError("speaker diarization is disabled by server configuration")
+        if not job.audio_file:
+            raise ValueError("No audio file associated with job")
+
+        audio_path = job.audio_file.file_path
+        if not Path(audio_path).exists():
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        if job.speaker_diarization_status != SpeakerDiarizationStatus.PROCESSING:
+            job.speaker_diarization_status = SpeakerDiarizationStatus.PROCESSING
+            job.speaker_diarization_started_at = utc_now()
+            job.speaker_diarization_completed_at = None
+            job.speaker_diarization_error = None
+            db.commit()
+
+        logger.info("Starting speaker diarization job %s: %s", job.id, audio_path)
+        speaker_turns = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: speaker_diarization_service.diarize_audio(audio_path)
+        )
+        segments = job.result_segments if isinstance(job.result_segments, list) else []
+        labelled_segments = speaker_diarization_service.assign_speakers_to_segments(
+            segments, speaker_turns
+        )
+
+        job.result_segments = labelled_segments
+        job.speaker_diarization_turns = speaker_turns
+        job.speaker_diarization_status = SpeakerDiarizationStatus.COMPLETED
+        job.speaker_diarization_completed_at = utc_now()
+        job.speaker_diarization_error = None
+        db.commit()
+        logger.info("Completed speaker diarization job %s", job.id)
+        return True
+
+    except Exception as exc:
+        logger.error("Speaker diarization job %s failed: %s", job.id, exc)
+        job.speaker_diarization_status = SpeakerDiarizationStatus.FAILED
+        job.speaker_diarization_error = str(exc)
+        job.speaker_diarization_completed_at = utc_now()
         db.commit()
         return False
 

@@ -4,8 +4,8 @@
 <div class="max-w-2xl mx-auto space-y-6">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-900">音声アップロード</h1>
-        <a href="/transcription" class="text-gray-600 hover:text-gray-900">
-            &larr; 戻る
+        <a href="/history/uploads" class="text-gray-600 hover:text-gray-900">
+            履歴へ戻る
         </a>
     </div>
 
@@ -22,6 +22,8 @@
         action="/transcription/upload"
         enctype="multipart/form-data"
         class="card space-y-6"
+        data-max-upload-size-bytes="{{ max_upload_size_bytes }}"
+        data-max-upload-size-mb="{{ max_upload_size_mb }}"
     >
         <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
         <div>
@@ -37,11 +39,11 @@
                     <div class="flex text-sm text-gray-600">
                         <label for="file" class="relative cursor-pointer rounded-md font-medium text-primary-600 hover:text-primary-500">
                             <span>ファイルを選択</span>
-                            <input id="file" name="file" type="file" class="sr-only" accept="audio/*" required>
+                            <input id="file" name="file" type="file" class="sr-only" accept="audio/*,video/mp4,video/quicktime,video/webm" required>
                         </label>
                         <p class="pl-1">またはドラッグ＆ドロップ</p>
                     </div>
-                    <p class="text-xs text-gray-500">MP3, WAV, M4A, FLAC, OGG（最大{{ max_upload_size_mb }}MB）</p>
+                    <p class="text-xs text-gray-500">MP3, WAV, M4A, FLAC, OGG, MP4, MOV, WebM（最大{{ max_upload_size_mb }}MB）</p>
                     <p id="file-name" class="text-sm font-medium text-primary-600 hidden"></p>
                 </div>
             </div>
@@ -63,7 +65,7 @@
             </p>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid gap-4 md:grid-cols-2">
             <div>
                 <label for="engine" class="label">文字起こしエンジン</label>
                 <select id="engine" name="engine" class="input">
@@ -72,27 +74,23 @@
                 </select>
             </div>
 
-            <div>
-                <label for="model_size" class="label">モデルサイズ</label>
+            <div id="model-size-field" class="{% if default_engine == 'parakeet_ja' %}hidden{% endif %}">
+                <label for="model_size" class="label">Whisper用モデルサイズ</label>
                 <select id="model_size" name="model_size" class="input">
-                    <option value="tiny">Tiny（最速）</option>
-                    <option value="base">Base</option>
-                    <option value="small">Small</option>
-                    <option value="medium" selected>Medium</option>
-                    <option value="large">Large（高品質）</option>
+                    <option value="tiny" {% if default_whisper_model_size == "tiny" %}selected{% endif %}>Tiny（最速）</option>
+                    <option value="base" {% if default_whisper_model_size == "base" %}selected{% endif %}>Base</option>
+                    <option value="small" {% if default_whisper_model_size == "small" %}selected{% endif %}>Small</option>
+                    <option value="medium" {% if default_whisper_model_size == "medium" %}selected{% endif %}>Medium</option>
+                    <option value="large" {% if default_whisper_model_size == "large" %}selected{% endif %}>Large（高品質）</option>
                 </select>
             </div>
         </div>
 
         <p id="engine-help" class="text-xs text-gray-500">
-            Parakeet JA は本番向けの既定エンジンです。Faster Whisper を選ぶとモデルサイズ設定が有効になります。
+            Parakeet JA は日本語向けの固定モデルを使います。Whisper用モデルサイズの選択は不要です。
         </p>
 
         {% if speaker_diarization_enabled %}
-        <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            この環境では、batch 文字起こし完了後に話者分離も実行されます。
-        </div>
-
         <label class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
             <input
                 type="checkbox"
@@ -103,21 +101,21 @@
             >
             <span class="text-sm text-gray-700">
                 <span class="block font-medium text-gray-900">このジョブで話者分離も実行する</span>
-                <span class="block text-xs text-gray-500">完了まで少し長くなる可能性があります。必要なジョブだけ有効にしてください。</span>
+                <span class="block text-xs text-gray-500">任意機能です。有効にすると完了まで長くなる可能性があります。</span>
             </span>
         </label>
         {% endif %}
 
         <div>
-            <label for="language" class="label">言語（任意）</label>
+            <label for="language" class="label">言語</label>
             <select id="language" name="language" class="input">
+                <option value="ja" {% if default_language == "ja" %}selected{% endif %}>日本語</option>
                 <option value="">自動検出</option>
-                <option value="ja">日本語</option>
-                <option value="en">英語</option>
-                <option value="zh">中国語</option>
-                <option value="ko">韓国語</option>
+                <option value="en" {% if default_language == "en" %}selected{% endif %}>英語</option>
+                <option value="zh" {% if default_language == "zh" %}selected{% endif %}>中国語</option>
+                <option value="ko" {% if default_language == "ko" %}selected{% endif %}>韓国語</option>
             </select>
-            <p class="text-xs text-gray-500 mt-1">空欄にすると自動で言語を検出します</p>
+            <p class="text-xs text-gray-500 mt-1">通常は日本語のままで利用します。混在音声などでは自動検出を選んでください。</p>
         </div>
 
         <div class="flex justify-end">
@@ -143,7 +141,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressBar = document.getElementById('upload-progress-bar');
     const progressText = document.getElementById('upload-progress-text');
     const progressStage = document.getElementById('upload-progress-stage');
+    const maxUploadSizeBytes = Number(form.dataset.maxUploadSizeBytes || 0);
+    const maxUploadSizeMb = Number(form.dataset.maxUploadSizeMb || 0);
     let isUploading = false;
+
+    function formatFileSize(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return '';
+        const gib = bytes / (1024 * 1024 * 1024);
+        if (gib >= 1) return `${gib.toFixed(2)}GB`;
+        const mib = bytes / (1024 * 1024);
+        return `${mib.toFixed(1)}MB`;
+    }
 
     function showError(message) {
         if (!message) {
@@ -153,6 +161,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         errorBox.textContent = message;
         errorBox.classList.remove('hidden');
+        errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function selectedFileError(file) {
+        if (!file) return 'ファイルが選択されていません';
+        if (maxUploadSizeBytes > 0 && file.size > maxUploadSizeBytes) {
+            const selectedSize = formatFileSize(file.size);
+            const limitSize = maxUploadSizeMb > 0 ? `${maxUploadSizeMb}MB` : formatFileSize(maxUploadSizeBytes);
+            return `ファイルが大きすぎます。選択したファイルは${selectedSize}、上限は${limitSize}です。`;
+        }
+        return '';
+    }
+
+    function updateSelectedFile(file) {
+        if (!file) {
+            fileName.textContent = '';
+            fileName.classList.add('hidden');
+            return;
+        }
+
+        const sizeText = formatFileSize(file.size);
+        fileName.textContent = sizeText ? `${file.name}（${sizeText}）` : file.name;
+        fileName.classList.remove('hidden');
+
+        const error = selectedFileError(file);
+        showError(error);
     }
 
     function setUploadingState(uploading) {
@@ -177,13 +211,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function syncEngineFormState() {
         const engineSelect = document.getElementById('engine');
         const modelSizeSelect = document.getElementById('model_size');
+        const modelSizeField = document.getElementById('model-size-field');
         const engineHelp = document.getElementById('engine-help');
         const isParakeet = engineSelect.value === 'parakeet_ja';
+        modelSizeField.classList.toggle('hidden', isParakeet);
         modelSizeSelect.disabled = isParakeet || isUploading;
         if (isParakeet) {
-            engineHelp.textContent = 'Parakeet JA は固定モデル (0.6B-ja) を使います。モデルサイズ設定は不要です。';
+            engineHelp.textContent = 'Parakeet JA は日本語向けの固定モデルを使います。Whisper用モデルサイズの選択は不要です。';
         } else {
-            engineHelp.textContent = 'Faster Whisper を選ぶとモデルサイズ設定が有効になります。';
+            engineHelp.textContent = 'Faster Whisper を選んだ場合だけ、Whisper用モデルサイズを指定できます。';
         }
     }
 
@@ -201,8 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show selected file name
     fileInput.addEventListener('change', function() {
         if (this.files.length > 0) {
-            fileName.textContent = this.files[0].name;
-            fileName.classList.remove('hidden');
+            updateSelectedFile(this.files[0]);
         }
     });
 
@@ -222,15 +257,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (e.dataTransfer.files.length > 0) {
             fileInput.files = e.dataTransfer.files;
-            fileName.textContent = e.dataTransfer.files[0].name;
-            fileName.classList.remove('hidden');
+            updateSelectedFile(e.dataTransfer.files[0]);
         }
     });
 
     form.addEventListener('submit', function(event) {
         event.preventDefault();
-        if (!fileInput.files || fileInput.files.length === 0) {
-            showError('ファイルが選択されていません');
+        const selectedFile = fileInput.files && fileInput.files.length > 0 ? fileInput.files[0] : null;
+        const fileError = selectedFileError(selectedFile);
+        if (fileError) {
+            showError(fileError);
             return;
         }
 
@@ -273,7 +309,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             progressWrap.classList.add('hidden');
-            showError(payload && payload.error ? payload.error : `アップロードに失敗しました (${xhr.status})`);
+            let message = payload && (payload.error || payload.detail) ? (payload.error || payload.detail) : '';
+            if (!message && xhr.status === 401) {
+                message = 'ログイン状態を確認できません。ページを再読み込みしてログインしてください。';
+            } else if (!message && xhr.status === 403) {
+                message = '認証情報またはCSRFトークンを確認できません。ページを再読み込みして再試行してください。';
+            } else if (!message && xhr.status === 413) {
+                message = `ファイルが大きすぎます。上限は${maxUploadSizeMb}MBです。`;
+            }
+            showError(message || `アップロードに失敗しました (${xhr.status})`);
         });
 
         xhr.addEventListener('error', function() {

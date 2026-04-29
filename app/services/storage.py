@@ -9,7 +9,7 @@ from app.time_utils import tokyo_now
 
 settings = get_settings()
 
-# Allowed audio MIME types
+# Allowed audio/video MIME types. ffmpeg extracts audio from video containers.
 ALLOWED_AUDIO_TYPES = {
     "audio/mpeg": ".mp3",
     "audio/mp3": ".mp3",
@@ -23,6 +23,9 @@ ALLOWED_AUDIO_TYPES = {
     "audio/mp4": ".m4a",
     "audio/x-m4a": ".m4a",
     "audio/aac": ".aac",
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/webm": ".webm",
 }
 
 UPLOAD_STREAM_CHUNK_SIZE = 4 * 1024 * 1024  # 4MB

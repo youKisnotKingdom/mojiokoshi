@@ -7,7 +7,7 @@
         <span class="text-yellow-600 font-medium">開始待ち...</span>
     </div>
     <p class="text-sm text-gray-500 mt-2">
-        文字起こしジョブはキューに入っています。まもなく処理が開始されます。
+        文字起こしは順番待ちです。まもなく処理が開始されます。
     </p>
 
     {% elif job.status.value == 'processing' %}
@@ -15,7 +15,13 @@
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <div class="animate-spin h-5 w-5 border-2 border-primary-600 border-t-transparent rounded-full"></div>
-                <span class="text-primary-600 font-medium">処理中...</span>
+                <span class="text-primary-600 font-medium">
+                    {% if job.enable_speaker_diarization and job.progress_percent >= 99 %}
+                    話者分離中...
+                    {% else %}
+                    処理中...
+                    {% endif %}
+                </span>
             </div>
             <span class="text-sm text-gray-500">{{ "%.0f"|format(job.progress_percent) }}%</span>
         </div>
@@ -25,19 +31,48 @@
                 style="width: {{ job.progress_percent }}%"
             ></div>
         </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+            {% if job.started_at %}
+            <span>開始: {{ job.started_at|jst_datetime('%H:%M:%S') }}</span>
+            <span>経過: {{ job.started_at|elapsed_between }}</span>
+            {% else %}
+            <span>開始待ち</span>
+            {% endif %}
+        </div>
+        {% if job.enable_speaker_diarization and job.progress_percent >= 99 %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            文字起こし本文の生成後、話者分離を実行しています。長い音声ではここが数分以上かかる場合があります。
+        </div>
+        {% endif %}
     </div>
 
     {% elif job.status.value == 'completed' %}
-    <div class="flex items-center space-x-3">
-        <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-        </svg>
-        <span class="text-green-600 font-medium">完了</span>
-        {% if job.completed_at %}
-        <span class="text-sm text-gray-500">
-            ({{ job.duration_display }})
-        </span>
-        {% endif %}
+    <div class="space-y-3">
+        <div class="flex items-center space-x-3">
+            <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-green-600 font-medium">完了</span>
+            {% if job.completed_at %}
+            <span class="text-sm text-gray-500">
+                ({{ job.duration_display }})
+            </span>
+            {% endif %}
+        </div>
+        <div class="grid gap-2 text-xs sm:grid-cols-3">
+            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                <div class="font-medium text-gray-500">開始</div>
+                <div class="mt-0.5 text-gray-900">{{ job.started_at|jst_datetime('%H:%M:%S') if job.started_at else '-' }}</div>
+            </div>
+            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                <div class="font-medium text-gray-500">完了</div>
+                <div class="mt-0.5 text-gray-900">{{ job.completed_at|jst_datetime('%H:%M:%S') if job.completed_at else '-' }}</div>
+            </div>
+            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                <div class="font-medium text-gray-500">実行</div>
+                <div class="mt-0.5 text-gray-900">{{ job.started_at|elapsed_between(job.completed_at) if job.started_at else '-' }}</div>
+            </div>
+        </div>
     </div>
 
     {% elif job.status.value == 'failed' %}

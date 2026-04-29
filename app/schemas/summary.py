@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.summary import SummaryStatus
 
@@ -13,6 +13,8 @@ class SummaryCreate(BaseModel):
 
 
 class SummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     transcription_job_id: uuid.UUID
     user_id: int
@@ -23,9 +25,6 @@ class SummaryResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
-
-    class Config:
-        from_attributes = True
 
 
 class PromptTemplateCreate(BaseModel):
@@ -44,6 +43,8 @@ class PromptTemplateUpdate(BaseModel):
 
 
 class PromptTemplateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     description: str | None
@@ -52,6 +53,3 @@ class PromptTemplateResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime | None
-
-    class Config:
-        from_attributes = True
