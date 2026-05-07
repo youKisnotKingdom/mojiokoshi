@@ -280,6 +280,26 @@ def test_history_defaults_to_current_user_and_can_search_all(user_client, db, re
     assert "Guest User" in all_search_response.text
 
 
+def test_history_all_scope_shows_all_users_without_search(user_client, db, regular_user):
+    own_job = _completed_job(db, regular_user.id)
+    own_job.audio_file.original_filename = "own-upload.wav"
+    other = _other_user(db)
+    other_job = _completed_job(db, other.id)
+    other_job.audio_file.original_filename = "other-upload.wav"
+    db.commit()
+
+    own_response = user_client.get("/history/uploads")
+    all_response = user_client.get("/history/uploads?scope=all")
+
+    assert own_response.status_code == 200
+    assert "own-upload.wav" in own_response.text
+    assert "other-upload.wav" not in own_response.text
+    assert all_response.status_code == 200
+    assert "own-upload.wav" in all_response.text
+    assert "other-upload.wav" in all_response.text
+    assert "Guest User" in all_response.text
+
+
 def test_job_detail_shows_transcription_chunks_with_time_badges(user_client, db, regular_user):
     job = _completed_job(db, regular_user.id)
     db.add_all(
