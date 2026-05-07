@@ -188,6 +188,20 @@ async def reset_user_password(
     if not user:
         raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
 
+    if user.external_auth_provider == "ldap":
+        return templates.TemplateResponse(
+            "admin/users/form.html",
+            {
+                "request": request,
+                "title": f"ユーザー編集: {user.display_name}",
+                "user": user,
+                "roles": UserRole,
+                "current_user": admin,
+                "error": "LDAPユーザーのパスワードはLDAP側で管理してください",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
     auth_service.update_user_password(db, user, new_password)
 
     return templates.TemplateResponse(

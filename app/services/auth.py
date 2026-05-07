@@ -179,7 +179,7 @@ def update_user(
     is_active: bool | None = None,
 ) -> User:
     """Update user information."""
-    if display_name is not None:
+    if display_name is not None and user.external_auth_provider != "ldap":
         user.display_name = display_name
     if role is not None:
         user.role = role

@@ -14,7 +14,7 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ユーザーID
+                        アプリID
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         名前
@@ -38,9 +38,20 @@
                 <tr class="{% if not user.is_active %}bg-gray-50 opacity-60{% endif %}">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="font-mono text-sm">{{ user.user_id }}</span>
+                        {% if user.external_auth_provider == 'ldap' %}
+                        <div class="mt-1 text-xs text-gray-500">
+                            LDAP ID:
+                            <span class="font-mono">{{ user.external_auth_id }}</span>
+                        </div>
+                        {% else %}
+                        <div class="mt-1 text-xs text-gray-500">ローカル</div>
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="font-medium text-gray-900">{{ user.display_name }}</span>
+                        {% if user.external_auth_provider == 'ldap' %}
+                        <div class="mt-1 text-xs text-gray-500">LDAP表示名</div>
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         {% if user.role.value == 'admin' %}

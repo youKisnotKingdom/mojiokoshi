@@ -8,6 +8,25 @@ def get_csrf_token(client, url="/admin/users/new"):
     return match.group(1) if match else ""
 
 
+def create_ldap_user(db, user_id="123456", external_id="ldap-hanako", display_name="LDAP Hanako"):
+    from app.models.user import User, UserRole
+    from app.services.auth import get_password_hash
+
+    user = User(
+        user_id=user_id,
+        external_auth_provider="ldap",
+        external_auth_id=external_id,
+        password_hash=get_password_hash("local-password-not-used"),
+        display_name=display_name,
+        role=UserRole.USER,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 class TestUserList:
     def test_admin_can_view_users(self, admin_client):
         response = admin_client.get("/admin/users")
@@ -21,6 +40,18 @@ class TestUserList:
     def test_anonymous_cannot_view_users(self, client):
         response = client.get("/admin/users", follow_redirects=False)
         assert response.status_code == 401
+
+    def test_admin_can_see_ldap_identity_in_user_list(self, admin_client, db):
+        create_ldap_user(db)
+
+        response = admin_client.get("/admin/users")
+
+        assert response.status_code == 200
+        assert "アプリID" in response.text
+        assert "LDAP Hanako" in response.text
+        assert "LDAP ID" in response.text
+        assert "ldap-hanako" in response.text
+        assert "LDAP表示名" in response.text
 
 
 class TestCreateUser:
@@ -73,6 +104,51 @@ class TestUpdateUser:
         )
         assert response.status_code == 200
         assert "更新しました" in response.text
+
+    def test_ldap_user_edit_page_shows_ldap_identity_and_hides_password_reset(self, admin_client, db):
+        user = create_ldap_user(db)
+
+        response = admin_client.get(f"/admin/users/{user.user_id}")
+
+        assert response.status_code == 200
+        assert "LDAP ID" in response.text
+        assert "ldap-hanako" in response.text
+        assert "LDAPログイン時にLDAP側の表示名で更新されます" in response.text
+        assert "readonly" in response.text
+        assert "パスワードリセット" not in response.text
+
+    def test_ldap_user_display_name_is_not_overwritten_from_admin_form(self, admin_client, db):
+        user = create_ldap_user(db)
+        csrf = get_csrf_token(admin_client, f"/admin/users/{user.user_id}")
+
+        response = admin_client.post(
+            f"/admin/users/{user.user_id}",
+            data={
+                "display_name": "Manual Name",
+                "role": "user",
+                "is_active": "true",
+                "csrf_token": csrf,
+            },
+        )
+
+        assert response.status_code == 200
+        db.refresh(user)
+        assert user.display_name == "LDAP Hanako"
+
+    def test_ldap_user_password_reset_is_rejected(self, admin_client, db):
+        user = create_ldap_user(db)
+        csrf = get_csrf_token(admin_client, f"/admin/users/{user.user_id}")
+
+        response = admin_client.post(
+            f"/admin/users/{user.user_id}/reset-password",
+            data={
+                "new_password": "NewPass123",
+                "csrf_token": csrf,
+            },
+        )
+
+        assert response.status_code == 400
+        assert "LDAPユーザーのパスワードはLDAP側で管理してください" in response.text
 
     def test_cannot_deactivate_self(self, admin_client, admin_user):
         csrf = get_csrf_token(admin_client, f"/admin/users/{admin_user.user_id}")

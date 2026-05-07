@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% set is_ldap_user = user and user.external_auth_provider == 'ldap' %}
 <div class="max-w-2xl mx-auto space-y-6">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-900">
@@ -26,11 +27,22 @@
     <div class="card">
         {% if user %}
         <div class="mb-6 pb-6 border-b border-gray-200">
-            <div class="flex items-center space-x-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                    <p class="text-sm text-gray-500">ユーザーID</p>
+                    <p class="text-sm text-gray-500">アプリID</p>
                     <p class="font-mono text-lg font-bold text-gray-900">{{ user.user_id }}</p>
                 </div>
+                {% if is_ldap_user %}
+                <div>
+                    <p class="text-sm text-gray-500">LDAP ID</p>
+                    <p class="font-mono text-gray-900">{{ user.external_auth_id }}</p>
+                </div>
+                {% else %}
+                <div>
+                    <p class="text-sm text-gray-500">認証</p>
+                    <p class="text-gray-900">ローカル</p>
+                </div>
+                {% endif %}
                 <div>
                     <p class="text-sm text-gray-500">作成日</p>
                     <p class="text-gray-900">{{ user.created_at|jst_datetime('%Y-%m-%d') }}</p>
@@ -47,10 +59,16 @@
                     type="text"
                     id="display_name"
                     name="display_name"
-                    class="input"
+                    class="input {% if is_ldap_user %}bg-gray-50 text-gray-700{% endif %}"
                     value="{{ user.display_name if user else '' }}"
                     required
+                    {% if is_ldap_user %}readonly aria-describedby="display-name-help"{% endif %}
                 />
+                {% if is_ldap_user %}
+                <p id="display-name-help" class="text-xs text-gray-500 mt-1">
+                    LDAPログイン時にLDAP側の表示名で更新されます。
+                </p>
+                {% endif %}
             </div>
 
             {% if not user %}
@@ -100,7 +118,7 @@
         </form>
     </div>
 
-    {% if user %}
+    {% if user and not is_ldap_user %}
     <div class="card">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">パスワードリセット</h2>
         <form method="POST" action="/admin/users/{{ user.user_id }}/reset-password" class="space-y-4">
