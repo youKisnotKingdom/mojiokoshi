@@ -1,6 +1,7 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from math import ceil
 
 from sqlalchemy import (
     BigInteger,
@@ -16,6 +17,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.time_utils import utc_now
 
 
 class AudioSource(str, enum.Enum):
@@ -60,6 +62,19 @@ class AudioFile(Base):
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
+
+    @property
+    def retention_days_remaining(self) -> int | None:
+        """Whole days remaining before the physical audio file expires."""
+        if self.deleted_at is not None or self.expires_at is None:
+            return None
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        remaining_seconds = (expires_at - utc_now()).total_seconds()
+        if remaining_seconds <= 0:
+            return 0
+        return max(1, ceil(remaining_seconds / 86400))
 
     @property
     def duration_display(self) -> str:

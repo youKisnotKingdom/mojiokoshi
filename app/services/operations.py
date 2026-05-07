@@ -15,6 +15,7 @@ from app.models import (
     TranscriptionJob,
     TranscriptionStatus,
 )
+from app.services import runtime_settings
 from app.time_utils import utc_now
 
 settings = get_settings()
@@ -80,6 +81,7 @@ def _serialize_summary(summary: Summary) -> dict[str, object]:
 
 
 def build_operations_snapshot(db: Session) -> dict[str, object]:
+    runtime_settings.apply_runtime_settings(db)
     now = utc_now()
 
     transcription_pending_stmt = (

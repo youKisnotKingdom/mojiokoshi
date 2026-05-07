@@ -1,7 +1,8 @@
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+from app.config import get_settings
 from app.models import (
     AudioFile,
     AudioSource,
@@ -14,6 +15,7 @@ from app.models import (
     TranscriptionJob,
     TranscriptionStatus,
 )
+from app.time_utils import utc_now
 
 
 def _completed_job(db, user_id: int) -> TranscriptionJob:
@@ -26,6 +28,7 @@ def _completed_job(db, user_id: int) -> TranscriptionJob:
         file_size=123,
         mime_type="video/mp4",
         duration_seconds=65.0,
+        expires_at=utc_now() + timedelta(days=30),
     )
     job = TranscriptionJob(
         id=uuid.uuid4(),
@@ -48,27 +51,120 @@ def _completed_job(db, user_id: int) -> TranscriptionJob:
     return job
 
 
+def _make_source_file(db, job: TranscriptionJob, tmp_path, *, mime_type: str = "audio/wav") -> None:
+    source_path = tmp_path / "source.wav"
+    source_path.write_bytes(b"audio-bytes")
+    job.audio_file.file_path = str(source_path)
+    job.audio_file.mime_type = mime_type
+    job.audio_file.original_filename = source_path.name
+    db.commit()
+
+
 def test_job_detail_shows_download_and_summary_prompt_controls(user_client, db, regular_user):
     job = _completed_job(db, regular_user.id)
 
     response = user_client.get(f"/transcription/job/{job.id}")
 
     assert response.status_code == 200
-    assert "本文コピー" in response.text
+    assert "文字起こし結果" in response.text
+    assert "本文コピー" not in response.text
     assert "話者TXT" in response.text
-    assert "LLM処理プロンプト" in response.text
-    assert "次の操作" in response.text
+    assert "LLM処理プロンプト" not in response.text
+    assert "次の操作" not in response.text
     assert "Step 1" in response.text
     assert "Step 2" in response.text
-    assert "処理ログ" in response.text
+    assert "処理ログ" not in response.text
+    assert "処理詳細" in response.text
+    assert "data-processing-details" in response.text
+    assert "エンジン:" not in response.text
+    assert "文字起こし設定" in response.text
+    assert "parakeet_ja" in response.text
+    assert "parakeet-tdt_ctc-0.6b-ja" in response.text
+    assert "文字起こしとLLM処理の状態、完了後の結果を同じ流れで確認できます。" not in response.text
+    assert "時刻は日本時間、経過は現在または完了時点まで" not in response.text
+    assert "音声保持:" in response.text
+    assert "あと30日" in response.text
     assert "文字起こし待機" in response.text
     assert "本文整形" in response.text
     assert "先頭だけ表示し、全文はプルダウンで確認できます" not in response.text
     assert "文字起こし全文を表示" in response.text
     assert "llm-result-panel" in response.text
     assert "llm-result-panel-meta" in response.text
+    assert '<details id="llm-result-panel-meta"' in response.text
     assert "全文を別枠で表示しています" in response.text
     assert "max-h-96" not in response.text
+    assert "captureLlmProgressScrollState" in response.text
+    assert "restoreLlmProgressScrollState" in response.text
+
+
+def test_job_detail_can_show_next_actions_when_enabled(user_client, db, regular_user):
+    settings = get_settings()
+    original_value = settings.show_next_actions
+    try:
+        settings.show_next_actions = True
+        job = _completed_job(db, regular_user.id)
+
+        response = user_client.get(f"/transcription/job/{job.id}")
+
+        assert response.status_code == 200
+        assert "次の操作" in response.text
+        assert "LLM処理プロンプト" in response.text
+        assert "next-actions" in response.text
+    finally:
+        settings.show_next_actions = original_value
+
+
+def test_job_detail_shows_source_audio_player_and_seek_buttons(user_client, db, regular_user, tmp_path):
+    job = _completed_job(db, regular_user.id)
+    _make_source_file(db, job, tmp_path)
+    db.add_all(
+        [
+            TranscriptionChunk(
+                transcription_job_id=job.id,
+                user_id=regular_user.id,
+                chunk_index=0,
+                start_seconds=0.0,
+                end_seconds=10.0,
+                raw_text="文字起こしチャンク1",
+                refinement_status=ChunkRefinementStatus.COMPLETED,
+            ),
+            TranscriptionChunk(
+                transcription_job_id=job.id,
+                user_id=regular_user.id,
+                chunk_index=1,
+                start_seconds=10.0,
+                end_seconds=20.0,
+                raw_text="文字起こしチャンク2",
+                refinement_status=ChunkRefinementStatus.COMPLETED,
+            ),
+        ]
+    )
+    db.commit()
+
+    response = user_client.get(f"/transcription/job/{job.id}")
+
+    assert response.status_code == 200
+    assert "元音声" in response.text
+    assert 'id="source-media"' in response.text
+    assert f'/transcription/job/{job.id}/audio' in response.text
+    assert "js-seek-audio" in response.text
+    assert 'data-audio-seek="0.000"' in response.text
+    assert 'data-audio-seek="10.000"' in response.text
+
+
+def test_history_shows_audio_retention_remaining(user_client, db, regular_user):
+    job = _completed_job(db, regular_user.id)
+
+    response = user_client.get("/history/uploads")
+
+    assert response.status_code == 200
+    assert "音声保持:" in response.text
+    assert "あと30日" in response.text
+    assert "data-history-row" in response.text
+    assert f'data-href="/transcription/job/{job.id}"' in response.text
+    assert ">表示<" not in response.text
+    assert "parakeet_ja" not in response.text
+    assert "parakeet-tdt_ctc-0.6b-ja" not in response.text
 
 
 def test_job_detail_shows_transcription_chunks_with_time_badges(user_client, db, regular_user):
@@ -173,6 +269,7 @@ def test_llm_processing_progress_shows_incremental_refined_chunks(user_client, d
     assert "00:00:00 - 00:00:10" in response.text
     assert "生チャンク2" not in response.text
     assert "progressive-refined-text" in response.text
+    assert 'data-preserve-scroll="progressive-refined-chunks"' in response.text
 
 
 def test_llm_processing_progress_partial_shows_completed_result(user_client, db, regular_user):
@@ -201,7 +298,8 @@ def test_llm_processing_progress_partial_shows_completed_result(user_client, db,
     assert "data-llm-result-source" in response.text
     assert "data-summary-model=\"test-model\"" in response.text
     assert "data-summary-duration=" in response.text
-    assert "実行" in response.text
+    assert "処理詳細" not in response.text
+    assert "data-processing-details" not in response.text
     assert "11.0秒" in response.text
     assert "data-llm-active=\"false\"" in response.text
     assert "hx-get=" not in response.text
@@ -377,6 +475,7 @@ def test_llm_processing_progress_can_pause_polling_for_result_panel(user_client,
     assert "data-llm-active=\"true\"" in response.text
     assert "data-polling-paused=\"false\"" in response.text
     assert "hx-trigger=\"every 2s\"" in response.text
+    assert "hx-swap=\"outerHTML show:none\"" in response.text
     assert "load, every 2s" not in response.text
     assert "this.dataset" not in response.text
     assert "js-open-llm-result" in response.text
@@ -399,6 +498,40 @@ def test_download_transcription_result_formats(user_client, db, regular_user):
     assert "SPEAKER_00: こんにちは" in vtt_response.text
     assert json_response.status_code == 200
     assert '"speaker_blocks"' in json_response.text
+
+
+def test_stream_job_audio_returns_retained_source_file(user_client, db, regular_user, tmp_path):
+    job = _completed_job(db, regular_user.id)
+    _make_source_file(db, job, tmp_path)
+
+    response = user_client.get(f"/transcription/job/{job.id}/audio")
+
+    assert response.status_code == 200
+    assert response.content == b"audio-bytes"
+    assert response.headers["content-type"].startswith("audio/wav")
+    assert "inline" in response.headers["content-disposition"]
+    assert "source.wav" in response.headers["content-disposition"]
+
+
+def test_stream_job_audio_returns_404_after_source_file_is_gone(user_client, db, regular_user):
+    job = _completed_job(db, regular_user.id)
+
+    response = user_client.get(f"/transcription/job/{job.id}/audio")
+
+    assert response.status_code == 404
+
+
+def test_stream_job_audio_returns_404_after_retention_expires(user_client, db, regular_user, tmp_path):
+    job = _completed_job(db, regular_user.id)
+    _make_source_file(db, job, tmp_path)
+    job.audio_file.expires_at = utc_now() - timedelta(minutes=1)
+    db.commit()
+
+    audio_response = user_client.get(f"/transcription/job/{job.id}/audio")
+    detail_response = user_client.get(f"/transcription/job/{job.id}")
+
+    assert audio_response.status_code == 404
+    assert 'id="source-media"' not in detail_response.text
 
 
 def test_download_summary_result(user_client, db, regular_user):
@@ -441,4 +574,5 @@ def test_summary_detail_renders_result_without_javascript(user_client, db, regul
     assert "# 長いLLM処理結果" in response.text
     assert "本文がサーバー描画で見える" in response.text
     assert "LLM処理結果の全文を表示" in response.text
+    assert "次の操作" not in response.text
     assert 'id="summary-progress"' not in response.text

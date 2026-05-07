@@ -48,7 +48,10 @@
     </section>
 
     <section class="card space-y-3">
-        <h2 class="text-lg font-semibold text-gray-900">Worker 設定</h2>
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Worker 設定</h2>
+            <a href="/admin/settings" class="btn btn-secondary text-sm">管理設定を開く</a>
+        </div>
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm text-gray-700">
             <div><span class="text-gray-500">Default engine:</span> {{ snapshot.worker.default_transcription_engine }}</div>
             <div><span class="text-gray-500">Realtime:</span> {{ "on" if snapshot.worker.enable_realtime_transcription else "off" }}</div>

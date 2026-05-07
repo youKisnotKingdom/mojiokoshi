@@ -28,40 +28,61 @@
                 <p class="mt-1 text-sm text-gray-500">
                     アップロード日時: {{ job.created_at|jst_datetime('%Y-%m-%d %H:%M') }}
                 </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="text-gray-500">エンジン:</span>
-                <span class="px-2 py-1 text-xs bg-gray-100 rounded">{{ job.engine.value }}</span>
-                {% if job.model_size %}
-                <span class="px-2 py-1 text-xs bg-gray-100 rounded">{{ job.model_size }}</span>
+                {% if job.audio_file and job.audio_file.is_deleted %}
+                <p class="mt-1 text-sm font-medium text-gray-500">
+                    音声ファイルは保持期限により削除済みです。文字起こし結果は引き続き閲覧できます。
+                </p>
+                {% elif job.audio_file and job.audio_file.expires_at %}
+                <p class="mt-1 text-sm text-gray-500">
+                    音声保持:
+                    {% if job.audio_file.retention_days_remaining == 0 %}
+                    本日削除対象
+                    {% else %}
+                    あと{{ job.audio_file.retention_days_remaining }}日
+                    {% endif %}
+                    （{{ job.audio_file.expires_at|jst_datetime('%Y-%m-%d') }}まで）
+                </p>
                 {% endif %}
             </div>
         </div>
+        {% if audio_available %}
+        <div class="mt-4 border-t border-gray-200 pt-4">
+            <div class="mb-2 text-sm font-medium text-gray-900">
+                {% if audio_is_video %}元動画{% else %}元音声{% endif %}
+            </div>
+            {% if audio_is_video %}
+            <video id="source-media" class="w-full max-h-72 rounded-lg bg-black" controls preload="metadata" src="/transcription/job/{{ job.id }}/audio"></video>
+            {% else %}
+            <audio id="source-media" class="w-full" controls preload="metadata" src="/transcription/job/{{ job.id }}/audio"></audio>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <div class="card" id="processing-timeline">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <h2 class="text-lg font-semibold text-gray-900">処理タイムライン</h2>
-                <p class="mt-1 text-sm text-gray-600">
-                    文字起こしとLLM処理の状態、完了後の結果を同じ流れで確認できます。
-                </p>
             </div>
-            {% if job.is_complete and job.result_text %}
+            {% if show_next_actions and job.is_complete and job.result_text %}
             <a href="#next-actions" class="btn btn-secondary text-sm">次の操作へ</a>
             {% endif %}
         </div>
 
-        <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="font-medium text-gray-900">処理ログ</h3>
-                <span class="text-xs text-gray-500">時刻は日本時間、経過は現在または完了時点まで</span>
-            </div>
-            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <details class="mt-5 rounded-lg border border-gray-200 bg-gray-50" data-processing-details>
+            <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700 hover:text-gray-900">
+                処理詳細
+            </summary>
+            <div class="grid gap-3 border-t border-gray-200 p-4 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded-lg bg-white p-3">
                     <div class="text-xs font-medium text-gray-500">アップロード</div>
                     <div class="mt-1 text-sm text-gray-900">{{ job.created_at|jst_datetime('%Y-%m-%d %H:%M:%S') }}</div>
                     <div class="mt-1 text-xs text-gray-500">音声長: {{ job.audio_file.duration_display if job.audio_file else '-' }}</div>
+                </div>
+                <div class="rounded-lg bg-white p-3">
+                    <div class="text-xs font-medium text-gray-500">文字起こし設定</div>
+                    <div class="mt-1 text-sm text-gray-900">{{ job.engine.value }}</div>
+                    <div class="mt-1 break-all text-xs text-gray-500">{{ job.model_size or '-' }}</div>
                 </div>
                 <div class="rounded-lg bg-white p-3">
                     <div class="text-xs font-medium text-gray-500">文字起こし待機</div>
@@ -87,7 +108,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </details>
 
         <div class="relative mt-6 pl-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-gray-200">
             <section class="relative pb-8">
@@ -109,34 +130,20 @@
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 1</p>
                             <h3 class="text-lg font-semibold text-gray-900">文字起こし</h3>
                         </div>
-                        <div class="ml-auto flex flex-wrap justify-end gap-2">
-                            {% if job.is_complete and job.result_text %}
-                            <button
-                                type="button"
-                                onclick="copyElementText('result-text', this)"
-                                class="btn btn-secondary text-sm"
-                            >
-                                本文コピー
-                            </button>
-                            {% if speaker_blocks %}
-                            <button
-                                type="button"
-                                onclick="copyJsonText('speaker-result-data', this)"
-                                class="btn btn-secondary text-sm"
-                            >
-                                話者付きコピー
-                            </button>
-                            {% endif %}
-                            <a href="/transcription/job/{{ job.id }}/download/txt" class="btn btn-secondary text-sm">TXT</a>
-                            {% if speaker_blocks %}
-                            <a href="/transcription/job/{{ job.id }}/download/speaker-txt" class="btn btn-secondary text-sm">話者TXT</a>
-                            {% endif %}
-                            <a href="/transcription/job/{{ job.id }}/download/vtt" class="btn btn-secondary text-sm">VTT</a>
-                            <a href="/transcription/job/{{ job.id }}/download/json" class="btn btn-secondary text-sm">JSON</a>
+                        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+                            {% if job.status.value == 'completed' %}
+                            <span class="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">完了</span>
+                            {% elif job.status.value == 'processing' %}
+                            <span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">処理中</span>
+                            {% elif job.status.value == 'pending' %}
+                            <span class="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">待機中</span>
+                            {% elif job.status.value == 'failed' %}
+                            <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">失敗</span>
                             {% endif %}
                         </div>
                     </div>
 
+                    {% if not job.is_complete or not job.result_text %}
                     <div
                         id="job-progress"
                         class="mt-4"
@@ -147,10 +154,38 @@
                     >
                         {% include "transcription/partials/job_progress.html" %}
                     </div>
+                    {% endif %}
 
                     {% if job.is_complete and job.result_text %}
-                    <div id="transcription-result-card" class="mt-5 border-t border-gray-200 pt-5">
-                        <details class="rounded-lg border border-gray-200 bg-white p-4">
+                    <div id="transcription-result-card" class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="font-medium text-gray-900">文字起こし結果</div>
+                            <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onclick="copyElementText('result-text', this)"
+                                    class="btn btn-secondary text-sm"
+                                >
+                                    コピー
+                                </button>
+                                {% if speaker_blocks %}
+                                <button
+                                    type="button"
+                                    onclick="copyJsonText('speaker-result-data', this)"
+                                    class="btn btn-secondary text-sm"
+                                >
+                                    話者付きコピー
+                                </button>
+                                {% endif %}
+                                <a href="/transcription/job/{{ job.id }}/download/txt" class="btn btn-secondary text-sm">TXT</a>
+                                {% if speaker_blocks %}
+                                <a href="/transcription/job/{{ job.id }}/download/speaker-txt" class="btn btn-secondary text-sm">話者TXT</a>
+                                {% endif %}
+                                <a href="/transcription/job/{{ job.id }}/download/vtt" class="btn btn-secondary text-sm">VTT</a>
+                                <a href="/transcription/job/{{ job.id }}/download/json" class="btn btn-secondary text-sm">JSON</a>
+                            </div>
+                        </div>
+                        <details class="mt-3 rounded-lg border border-gray-200 bg-white p-4">
                             <summary class="cursor-pointer font-medium text-gray-900">
                                 文字起こし全文を表示
                                 <span class="ml-2 text-xs font-normal text-gray-500">{{ job.result_text|length }}文字</span>
@@ -163,9 +198,21 @@
                                 {% if chunk_text %}
                                 <section class="rounded-lg border border-gray-200 bg-gray-50 p-3">
                                     <div class="mb-2">
+                                        {% if audio_available %}
+                                        <button
+                                            type="button"
+                                            class="js-seek-audio inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-primary-50 hover:text-primary-700 hover:ring-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            data-audio-seek="{{ '%.3f'|format(chunk.start_seconds or 0) }}"
+                                            aria-label="{{ chunk.start_seconds|timecode }}から再生"
+                                            title="この時刻を再生"
+                                        >
+                                            {{ chunk.start_seconds|timecode }} - {{ chunk.end_seconds|timecode }}
+                                        </button>
+                                        {% else %}
                                         <div class="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200">
                                             {{ chunk.start_seconds|timecode }} - {{ chunk.end_seconds|timecode }}
                                         </div>
+                                        {% endif %}
                                     </div>
                                     <div class="whitespace-pre-wrap break-words text-sm leading-7 text-gray-800">{{ chunk_text }}</div>
                                 </section>
@@ -189,7 +236,19 @@
                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-3">
                                 <div class="mb-1 flex items-center justify-between gap-3">
                                     <span class="font-medium text-gray-900">{{ block.speaker }}</span>
+                                    {% if audio_available %}
+                                    <button
+                                        type="button"
+                                        class="js-seek-audio shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200 transition hover:bg-primary-50 hover:text-primary-700 hover:ring-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        data-audio-seek="{{ '%.3f'|format(block.start or 0) }}"
+                                        aria-label="{{ '%.1f'|format(block.start) }}秒から再生"
+                                        title="この時刻を再生"
+                                    >
+                                        {{ '%.1f'|format(block.start) }}s - {{ '%.1f'|format(block.end) }}s
+                                    </button>
+                                    {% else %}
                                     <span class="text-xs text-gray-500">{{ '%.1f'|format(block.start) }}s - {{ '%.1f'|format(block.end) }}s</span>
+                                    {% endif %}
                                 </div>
                                 <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ block.text }}</p>
                             </div>
@@ -268,30 +327,35 @@
                 </button>
             </div>
         </div>
-        <div id="llm-result-panel-meta" class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-lg bg-gray-50 px-3 py-2">
-                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">モデル</div>
-                <div id="llm-result-panel-model" class="mt-1 truncate text-sm font-medium text-gray-900">-</div>
+        <details id="llm-result-panel-meta" class="mt-4 rounded-lg border border-gray-200 bg-gray-50" data-processing-details>
+            <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700 hover:text-gray-900">
+                処理詳細
+            </summary>
+            <div class="grid gap-2 border-t border-gray-200 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="rounded-lg bg-white px-3 py-2">
+                    <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">モデル</div>
+                    <div id="llm-result-panel-model" class="mt-1 truncate text-sm font-medium text-gray-900">-</div>
+                </div>
+                <div class="rounded-lg bg-white px-3 py-2">
+                    <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">開始</div>
+                    <div id="llm-result-panel-started" class="mt-1 text-sm font-medium text-gray-900">-</div>
+                </div>
+                <div class="rounded-lg bg-white px-3 py-2">
+                    <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">完了 / 実行</div>
+                    <div id="llm-result-panel-completed" class="mt-1 text-sm font-medium text-gray-900">-</div>
+                    <div id="llm-result-panel-duration" class="mt-0.5 text-xs text-gray-500">-</div>
+                </div>
+                <div class="rounded-lg bg-white px-3 py-2">
+                    <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">文字数</div>
+                    <div id="llm-result-panel-chars" class="mt-1 text-sm font-medium text-gray-900">-</div>
+                </div>
             </div>
-            <div class="rounded-lg bg-gray-50 px-3 py-2">
-                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">開始</div>
-                <div id="llm-result-panel-started" class="mt-1 text-sm font-medium text-gray-900">-</div>
-            </div>
-            <div class="rounded-lg bg-gray-50 px-3 py-2">
-                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">完了 / 実行</div>
-                <div id="llm-result-panel-completed" class="mt-1 text-sm font-medium text-gray-900">-</div>
-                <div id="llm-result-panel-duration" class="mt-0.5 text-xs text-gray-500">-</div>
-            </div>
-            <div class="rounded-lg bg-gray-50 px-3 py-2">
-                <div class="text-[11px] font-medium uppercase tracking-wide text-gray-500">文字数</div>
-                <div id="llm-result-panel-chars" class="mt-1 text-sm font-medium text-gray-900">-</div>
-            </div>
-        </div>
+        </details>
         <div id="llm-result-panel-rich" class="mt-4 hidden max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-white p-4"></div>
         <pre id="llm-result-panel-text" class="mt-4 max-h-[70vh] overflow-auto rounded-lg border border-gray-200 bg-white p-4 whitespace-pre-wrap break-words text-sm text-gray-700 font-sans"></pre>
     </div>
 
-    {% if job.is_complete and job.result_text %}
+    {% if show_next_actions and job.is_complete and job.result_text %}
     <div class="card" id="next-actions">
         <div class="mb-5">
             <h3 class="text-lg font-semibold text-gray-900">次の操作</h3>
@@ -340,7 +404,7 @@
             {% endif %}
         </div>
     </div>
-    {% else %}
+    {% elif show_next_actions %}
     <div class="card">
         <h3 class="text-lg font-semibold text-gray-900">完了後にできること</h3>
         <div class="mt-4 grid gap-3 sm:grid-cols-3">
@@ -399,6 +463,110 @@ function setupSummaryFormGuards(root) {
             }
         });
     });
+}
+
+let llmProgressScrollState = null;
+
+function getLlmProgressTarget(event) {
+    const detailTarget = event.detail && event.detail.target;
+    const target = detailTarget || event.target;
+    if (target && target.id === 'llm-processing-progress') {
+        return target;
+    }
+    if (target instanceof Element) {
+        return target.closest('#llm-processing-progress');
+    }
+    return null;
+}
+
+function findPreservedScrollElement(container, key) {
+    const elements = container.querySelectorAll('[data-preserve-scroll]');
+    for (const element of elements) {
+        if (element.dataset.preserveScroll === key) {
+            return element;
+        }
+    }
+    return null;
+}
+
+function captureLlmProgressScrollState(container) {
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const preserved = [];
+    container.querySelectorAll('[data-preserve-scroll]').forEach(function(element) {
+        const key = element.dataset.preserveScroll;
+        if (!key) return;
+        const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+        const distanceFromBottom = maxScrollTop - element.scrollTop;
+        preserved.push({
+            key: key,
+            scrollTop: element.scrollTop,
+            scrollLeft: element.scrollLeft,
+            distanceFromBottom: distanceFromBottom,
+            wasAtBottom: distanceFromBottom <= 8
+        });
+    });
+    llmProgressScrollState = {
+        containerTop: rect.top,
+        preserved: preserved
+    };
+}
+
+function restoreLlmProgressScrollState() {
+    const state = llmProgressScrollState;
+    llmProgressScrollState = null;
+    if (!state) return;
+
+    window.requestAnimationFrame(function() {
+        const container = document.getElementById('llm-processing-progress');
+        if (!container) return;
+
+        state.preserved.forEach(function(item) {
+            const element = findPreservedScrollElement(container, item.key);
+            if (!element) return;
+            const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+            element.scrollTop = item.wasAtBottom
+                ? maxScrollTop
+                : Math.min(item.scrollTop, maxScrollTop);
+            element.scrollLeft = item.scrollLeft;
+        });
+
+        const nextTop = container.getBoundingClientRect().top;
+        const targetTop = Math.max(0, window.scrollY + nextTop - state.containerTop);
+        window.scrollTo({ top: targetTop, left: window.scrollX, behavior: 'auto' });
+    });
+}
+
+function markSeekButton(button) {
+    if (!button) return;
+    button.classList.add('bg-primary-50', 'text-primary-700', 'ring-primary-200');
+    window.setTimeout(function() {
+        button.classList.remove('bg-primary-50', 'text-primary-700', 'ring-primary-200');
+    }, 900);
+}
+
+function seekSourceMedia(seconds, button) {
+    const media = document.getElementById('source-media');
+    const targetSeconds = Number(seconds);
+    if (!media || !Number.isFinite(targetSeconds)) return;
+
+    const seekTo = Math.max(0, targetSeconds);
+    const applySeek = function() {
+        media.currentTime = seekTo;
+        const playPromise = media.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(function() {});
+        }
+    };
+
+    media.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (media.readyState >= 1) {
+        applySeek();
+    } else {
+        media.addEventListener('loadedmetadata', applySeek, { once: true });
+        media.load();
+    }
+    markSeekButton(button);
 }
 
 function setLlmPollingPaused(paused) {
@@ -483,6 +651,8 @@ function openLlmResultPanel(sourceElementId, button) {
     body.textContent = getTextContainerContent(source);
     setLlmResultPanelMeta(source);
     setLlmResultPanelBody(source, body, richBody);
+    const meta = document.getElementById('llm-result-panel-meta');
+    if (meta) meta.open = false;
     panel.classList.remove('hidden');
     setLlmPollingPaused(true);
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -501,6 +671,8 @@ function closeLlmResultPanel() {
         richBody.innerHTML = '';
         richBody.classList.add('hidden');
     }
+    const meta = document.getElementById('llm-result-panel-meta');
+    if (meta) meta.open = false;
     setPanelText('llm-result-panel-title', 'LLM処理全文');
     setPanelText('llm-result-panel-model');
     setPanelText('llm-result-panel-started');
@@ -568,6 +740,13 @@ function copyJsonText(scriptId, button) {
 document.body.addEventListener('click', function(event) {
     if (!(event.target instanceof Element)) return;
 
+    const seekButton = event.target.closest('.js-seek-audio');
+    if (seekButton) {
+        event.preventDefault();
+        seekSourceMedia(seekButton.dataset.audioSeek, seekButton);
+        return;
+    }
+
     const openButton = event.target.closest('.js-open-llm-result');
     if (!openButton) return;
 
@@ -580,6 +759,17 @@ document.body.addEventListener('htmx:beforeRequest', function(event) {
     if (target && target.id === 'llm-processing-progress' && isLlmResultPanelOpen()) {
         event.preventDefault();
         setLlmPollingPaused(true);
+        return;
+    }
+    if (target && target.id === 'llm-processing-progress') {
+        captureLlmProgressScrollState(target);
+    }
+});
+
+document.body.addEventListener('htmx:beforeSwap', function(event) {
+    const target = getLlmProgressTarget(event);
+    if (target && target.id === 'llm-processing-progress') {
+        captureLlmProgressScrollState(target);
     }
 });
 
@@ -598,6 +788,7 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
     if (event.detail.target.id === 'llm-processing-progress') {
         const llmProgress = document.getElementById('llm-processing-progress') || document;
         renderSummaryPreviews(llmProgress);
+        restoreLlmProgressScrollState();
         if (isLlmResultPanelOpen()) {
             setLlmPollingPaused(true);
         }

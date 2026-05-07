@@ -211,7 +211,18 @@ def test_process_chunk_refinement_updates_refined_text(db, regular_user, monkeyp
         raw_segments=[],
     )
 
-    async def fake_call_llm_api(prompt, system_prompt=None, model=None, temperature=None, max_tokens=None):
+    monkeypatch.setattr(summarization.settings, "chunk_refinement_llm_temperature", 0.1)
+
+    async def fake_call_llm_api(
+        prompt,
+        system_prompt=None,
+        model=None,
+        temperature=None,
+        max_tokens=None,
+        api_base=None,
+        api_key=None,
+        timeout=None,
+    ):
         assert "対象チャンクの文字起こし" in prompt
         assert temperature == 0.1
         return summarization.LLMAPIResult(
@@ -228,6 +239,91 @@ def test_process_chunk_refinement_updates_refined_text(db, regular_user, monkeyp
     assert chunk.refinement_status == ChunkRefinementStatus.COMPLETED
     assert chunk.refined_text == "今日はテストです。"
     assert chunk.token_usage["finish_reason"] == "stop"
+
+
+def test_chunk_refinement_uses_dedicated_llm_settings(db, regular_user, monkeypatch):
+    job = _job(db, regular_user.id)
+    chunk = summarization.create_or_update_transcription_chunk(
+        db,
+        job,
+        chunk_index=0,
+        start_seconds=0.0,
+        end_seconds=10.0,
+        raw_text="CPU用モデルで整形します",
+        raw_segments=[],
+    )
+    monkeypatch.setattr(summarization.settings, "llm_api_base_url", "http://summary-llm/v1")
+    monkeypatch.setattr(summarization.settings, "llm_api_key", "summary-key")
+    monkeypatch.setattr(summarization.settings, "llm_model_name", "summary-model")
+    monkeypatch.setattr(
+        summarization.settings,
+        "chunk_refinement_llm_api_base_url",
+        "http://cpu-refiner/v1",
+    )
+    monkeypatch.setattr(summarization.settings, "chunk_refinement_llm_api_key", "")
+    monkeypatch.setattr(summarization.settings, "chunk_refinement_llm_model_name", "cpu-refiner")
+    monkeypatch.setattr(summarization.settings, "chunk_refinement_llm_timeout", 45)
+
+    captured = {}
+
+    async def fake_call_llm_api(
+        prompt,
+        system_prompt=None,
+        model=None,
+        temperature=None,
+        max_tokens=None,
+        api_base=None,
+        api_key=None,
+        timeout=None,
+    ):
+        captured.update(
+            {
+                "model": model,
+                "api_base": api_base,
+                "api_key": api_key,
+                "timeout": timeout,
+            }
+        )
+        return summarization.LLMAPIResult(content="CPU用モデルで整形します。")
+
+    monkeypatch.setattr(summarization, "call_llm_api_with_metadata", fake_call_llm_api)
+
+    assert asyncio.run(summarization.process_chunk_refinement(db, chunk)) is True
+
+    assert captured == {
+        "model": "cpu-refiner",
+        "api_base": "http://cpu-refiner/v1",
+        "api_key": "",
+        "timeout": 45,
+    }
+
+
+def test_chunk_refinement_preserves_raw_text_when_input_too_long(db, regular_user, monkeypatch):
+    job = _job(db, regular_user.id)
+    raw_text = "長い文字起こしです。" * 20
+    chunk = summarization.create_or_update_transcription_chunk(
+        db,
+        job,
+        chunk_index=0,
+        start_seconds=0.0,
+        end_seconds=10.0,
+        raw_text=raw_text,
+        raw_segments=[],
+    )
+    monkeypatch.setattr(summarization.settings, "llm_chunk_refinement_max_input_chars", 10)
+
+    async def fake_call_llm_api(*args, **kwargs):
+        raise AssertionError("too-long chunks should not be sent to the LLM")
+
+    monkeypatch.setattr(summarization, "call_llm_api_with_metadata", fake_call_llm_api)
+
+    assert asyncio.run(summarization.process_chunk_refinement(db, chunk)) is True
+
+    db.refresh(chunk)
+    assert chunk.refinement_status == ChunkRefinementStatus.COMPLETED
+    assert chunk.refined_text == raw_text
+    assert chunk.token_usage["skipped"] is True
+    assert chunk.token_usage["skip_reason"] == "input_too_long"
 
 
 def test_pending_chunk_refinement_blocks_final_summary_claim(db, regular_user):

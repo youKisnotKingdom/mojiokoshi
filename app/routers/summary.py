@@ -85,6 +85,7 @@ async def summary_detail_page(
             "title": "LLM処理",
             "current_user": current_user,
             "summary": summary,
+            "show_next_actions": settings.show_next_actions,
         },
     )
 

@@ -68,6 +68,7 @@
         </div>
     </div>
 
+    {% if show_next_actions %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-medium text-gray-900">次の操作</h2>
         <p class="mt-1 text-sm text-gray-600">
@@ -88,7 +89,9 @@
             </a>
         </div>
     </div>
+    {% endif %}
     {% else %}
+    {% if show_next_actions %}
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-medium text-gray-900">完了後にできること</h2>
         <div class="mt-3 grid gap-3 sm:grid-cols-3">
@@ -106,6 +109,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
     {% endif %}
 
     <!-- Info -->

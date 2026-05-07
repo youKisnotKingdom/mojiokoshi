@@ -4,18 +4,34 @@ Background worker for processing transcription and summarization jobs.
 import asyncio
 import logging
 import signal
+import time
 
 from app.config import get_settings
 from app.database import SessionLocal
-from app.services import cleanup, summarization, transcription
+from app.services import cleanup, runtime_settings, summarization, transcription
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 _running = False
-_cleanup_counter = 0
-CLEANUP_INTERVAL = 720
 MAX_RETRIES = 3
+
+
+def _cleanup_due(last_cleanup_at: float | None, interval_seconds: int) -> bool:
+    """Return whether periodic audio cleanup should run now."""
+    if interval_seconds <= 0:
+        return False
+    if last_cleanup_at is None:
+        return True
+    return (time.monotonic() - last_cleanup_at) >= interval_seconds
+
+
+def _apply_runtime_settings() -> None:
+    db = SessionLocal()
+    try:
+        runtime_settings.apply_runtime_settings(db)
+    finally:
+        db.close()
 
 
 async def _with_retry(coro_fn, job_id, job_type: str, poll_interval: float):
@@ -160,62 +176,70 @@ async def process_speaker_diarization_jobs(poll_interval: float = 5.0, concurren
 
 async def worker_loop(poll_interval: float | None = None):
     """Main worker loop that processes jobs continuously."""
-    global _running, _cleanup_counter
+    global _running
     _running = True
-    _cleanup_counter = 0
+    last_cleanup_at: float | None = None
 
-    poll_interval = poll_interval or settings.worker_poll_interval
-    transcription_concurrency = max(0, settings.worker_transcription_concurrency)
-    chunk_refinement_concurrency = max(0, settings.worker_chunk_refinement_concurrency)
-    summary_concurrency = max(0, settings.worker_summary_concurrency)
-    speaker_diarization_concurrency = max(0, settings.worker_speaker_diarization_concurrency)
-
-    logger.info(
-        (
-            "Worker started (poll_interval=%.1fs, transcription_concurrency=%d, "
-            "chunk_refinement_concurrency=%d, summary_concurrency=%d, "
-            "speaker_diarization_concurrency=%d, "
-            "transcription_stale_timeout=%ds, chunk_refinement_stale_timeout=%ds, "
-            "summary_stale_timeout=%ds, speaker_diarization_stale_timeout=%ds)"
-        ),
-        poll_interval,
-        transcription_concurrency,
-        chunk_refinement_concurrency,
-        summary_concurrency,
-        speaker_diarization_concurrency,
-        settings.worker_transcription_stale_timeout_seconds,
-        settings.worker_chunk_refinement_stale_timeout_seconds,
-        settings.worker_summary_stale_timeout_seconds,
-        settings.worker_speaker_diarization_stale_timeout_seconds,
-    )
+    active_config = None
 
     while _running:
         try:
+            _apply_runtime_settings()
+            effective_poll_interval = poll_interval or settings.worker_poll_interval
+            transcription_concurrency = max(0, settings.worker_transcription_concurrency)
+            chunk_refinement_concurrency = max(0, settings.worker_chunk_refinement_concurrency)
+            summary_concurrency = max(0, settings.worker_summary_concurrency)
+            speaker_diarization_concurrency = max(0, settings.worker_speaker_diarization_concurrency)
+            current_config = (
+                effective_poll_interval,
+                transcription_concurrency,
+                chunk_refinement_concurrency,
+                summary_concurrency,
+                speaker_diarization_concurrency,
+                settings.worker_transcription_stale_timeout_seconds,
+                settings.worker_chunk_refinement_stale_timeout_seconds,
+                settings.worker_summary_stale_timeout_seconds,
+                settings.worker_speaker_diarization_stale_timeout_seconds,
+                settings.worker_cleanup_interval_seconds,
+            )
+            if current_config != active_config:
+                active_config = current_config
+                logger.info(
+                    (
+                        "Worker settings active (poll_interval=%.1fs, transcription_concurrency=%d, "
+                        "chunk_refinement_concurrency=%d, summary_concurrency=%d, "
+                        "speaker_diarization_concurrency=%d, "
+                        "transcription_stale_timeout=%ds, chunk_refinement_stale_timeout=%ds, "
+                        "summary_stale_timeout=%ds, speaker_diarization_stale_timeout=%ds, "
+                        "cleanup_interval=%ds)"
+                    ),
+                    *current_config,
+                )
+
             transcription_count = (
-                await process_transcription_jobs(poll_interval, transcription_concurrency)
+                await process_transcription_jobs(effective_poll_interval, transcription_concurrency)
                 if transcription_concurrency > 0
                 else 0
             )
             chunk_refinement_count = (
-                await process_chunk_refinement_jobs(poll_interval, chunk_refinement_concurrency)
+                await process_chunk_refinement_jobs(effective_poll_interval, chunk_refinement_concurrency)
                 if chunk_refinement_concurrency > 0
                 else 0
             )
             summary_count = (
-                await process_summary_jobs(poll_interval, summary_concurrency)
+                await process_summary_jobs(effective_poll_interval, summary_concurrency)
                 if summary_concurrency > 0
                 else 0
             )
             speaker_diarization_count = (
-                await process_speaker_diarization_jobs(poll_interval, speaker_diarization_concurrency)
+                await process_speaker_diarization_jobs(effective_poll_interval, speaker_diarization_concurrency)
                 if speaker_diarization_concurrency > 0
                 else 0
             )
 
-            _cleanup_counter += 1
-            if _cleanup_counter >= CLEANUP_INTERVAL:
-                _cleanup_counter = 0
+            if _cleanup_due(last_cleanup_at, settings.worker_cleanup_interval_seconds):
                 await cleanup.run_cleanup_job()
+                last_cleanup_at = time.monotonic()
 
             if (
                 transcription_count == 0
@@ -223,14 +247,14 @@ async def worker_loop(poll_interval: float | None = None):
                 and summary_count == 0
                 and speaker_diarization_count == 0
             ):
-                await asyncio.sleep(poll_interval)
+                await asyncio.sleep(effective_poll_interval)
 
         except asyncio.CancelledError:
             logger.info("Worker cancelled")
             break
         except Exception as e:
             logger.error("Worker error: %s", e)
-            await asyncio.sleep(poll_interval)
+            await asyncio.sleep(poll_interval or settings.worker_poll_interval)
 
     logger.info("Worker stopped")
 

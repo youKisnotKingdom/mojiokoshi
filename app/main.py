@@ -18,7 +18,8 @@ from app.config import get_settings
 from app.database import SessionLocal
 from app.dependencies import get_current_user_optional, limiter
 from app.models.user import User
-from app.routers import auth, history, operations, recording_ws, summary, transcription, users
+from app.routers import admin_settings, auth, history, operations, recording_ws, summary, transcription, users
+from app.services import runtime_settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,14 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: run startup checks, then yield, then cleanup."""
+    db = SessionLocal()
+    try:
+        runtime_settings.apply_runtime_settings(db)
+    except Exception as exc:
+        logger.warning("管理画面設定の読み込みをスキップしました: %s", exc)
+    finally:
+        db.close()
+
     if not os.environ.get("SKIP_STARTUP_CHECKS"):
         async with httpx.AsyncClient(timeout=5.0) as http_client:
             try:
@@ -64,6 +73,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 # Include routers
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(admin_settings.router)
 app.include_router(transcription.router)
 app.include_router(recording_ws.router)
 app.include_router(history.router)

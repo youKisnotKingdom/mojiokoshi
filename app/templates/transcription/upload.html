@@ -65,31 +65,6 @@
             </p>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2">
-            <div>
-                <label for="engine" class="label">文字起こしエンジン</label>
-                <select id="engine" name="engine" class="input">
-                    <option value="parakeet_ja" {% if default_engine == "parakeet_ja" %}selected{% endif %}>Parakeet JA</option>
-                    <option value="faster_whisper" {% if default_engine == "faster_whisper" %}selected{% endif %}>Faster Whisper</option>
-                </select>
-            </div>
-
-            <div id="model-size-field" class="{% if default_engine == 'parakeet_ja' %}hidden{% endif %}">
-                <label for="model_size" class="label">Whisper用モデルサイズ</label>
-                <select id="model_size" name="model_size" class="input">
-                    <option value="tiny" {% if default_whisper_model_size == "tiny" %}selected{% endif %}>Tiny（最速）</option>
-                    <option value="base" {% if default_whisper_model_size == "base" %}selected{% endif %}>Base</option>
-                    <option value="small" {% if default_whisper_model_size == "small" %}selected{% endif %}>Small</option>
-                    <option value="medium" {% if default_whisper_model_size == "medium" %}selected{% endif %}>Medium</option>
-                    <option value="large" {% if default_whisper_model_size == "large" %}selected{% endif %}>Large（高品質）</option>
-                </select>
-            </div>
-        </div>
-
-        <p id="engine-help" class="text-xs text-gray-500">
-            Parakeet JA は日本語向けの固定モデルを使います。Whisper用モデルサイズの選択は不要です。
-        </p>
-
         {% if speaker_diarization_enabled %}
         <label class="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
             <input
@@ -208,21 +183,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function syncEngineFormState() {
-        const engineSelect = document.getElementById('engine');
-        const modelSizeSelect = document.getElementById('model_size');
-        const modelSizeField = document.getElementById('model-size-field');
-        const engineHelp = document.getElementById('engine-help');
-        const isParakeet = engineSelect.value === 'parakeet_ja';
-        modelSizeField.classList.toggle('hidden', isParakeet);
-        modelSizeSelect.disabled = isParakeet || isUploading;
-        if (isParakeet) {
-            engineHelp.textContent = 'Parakeet JA は日本語向けの固定モデルを使います。Whisper用モデルサイズの選択は不要です。';
-        } else {
-            engineHelp.textContent = 'Faster Whisper を選んだ場合だけ、Whisper用モデルサイズを指定できます。';
-        }
-    }
-
     window.addEventListener('beforeunload', function(event) {
         if (!isUploading) return;
         event.preventDefault();
@@ -231,8 +191,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Click to upload
     dropZone.addEventListener('click', () => fileInput.click());
-    document.getElementById('engine').addEventListener('change', syncEngineFormState);
-    syncEngineFormState();
 
     // Show selected file name
     fileInput.addEventListener('change', function() {
@@ -273,7 +231,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(form);
         showError('');
         setUploadingState(true);
-        syncEngineFormState();
         setProgress(0, 'アップロード中...');
 
         const xhr = new XMLHttpRequest();
@@ -293,7 +250,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         xhr.addEventListener('load', function() {
             setUploadingState(false);
-            syncEngineFormState();
 
             let payload = null;
             try {

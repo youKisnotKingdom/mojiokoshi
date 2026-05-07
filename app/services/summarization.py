@@ -167,14 +167,18 @@ async def call_llm_api_with_metadata(
     model: str | None = None,
     temperature: float | None = None,
     max_tokens: int | None = None,
+    api_base: str | None = None,
+    api_key: str | None = None,
+    timeout: int | float | None = None,
 ) -> LLMAPIResult:
-    api_base = settings.llm_api_base_url
-    api_key = settings.llm_api_key
+    request_api_base = settings.llm_api_base_url if api_base is None else api_base
+    request_api_key = settings.llm_api_key if api_key is None else api_key
     model_name = model or settings.llm_model_name
     request_temperature = settings.llm_temperature if temperature is None else temperature
     request_max_tokens = settings.llm_max_tokens if max_tokens is None else max_tokens
+    request_timeout = settings.llm_timeout if timeout is None else timeout
 
-    if not api_base:
+    if not request_api_base:
         raise ValueError("LLM API base URL not configured")
 
     messages = []
@@ -183,8 +187,8 @@ async def call_llm_api_with_metadata(
     messages.append({"role": "user", "content": prompt})
 
     headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    if request_api_key:
+        headers["Authorization"] = f"Bearer {request_api_key}"
 
     payload = {
         "model": model_name,
@@ -193,9 +197,9 @@ async def call_llm_api_with_metadata(
         "max_tokens": request_max_tokens,
     }
 
-    async with httpx.AsyncClient(timeout=float(settings.llm_timeout)) as client:
+    async with httpx.AsyncClient(timeout=float(request_timeout)) as client:
         response = await client.post(
-            f"{api_base}/chat/completions",
+            f"{request_api_base}/chat/completions",
             json=payload,
             headers=headers,
         )
@@ -210,6 +214,24 @@ async def call_llm_api_with_metadata(
         finish_reason=choice.get("finish_reason"),
         usage=data.get("usage"),
     )
+
+
+def chunk_refinement_llm_model_name() -> str:
+    return settings.chunk_refinement_llm_model_name.strip() or settings.llm_model_name
+
+
+def _chunk_refinement_llm_api_base_url() -> str:
+    return settings.chunk_refinement_llm_api_base_url.strip() or settings.llm_api_base_url
+
+
+def _chunk_refinement_llm_api_key() -> str:
+    if settings.chunk_refinement_llm_api_base_url.strip():
+        return settings.chunk_refinement_llm_api_key
+    return settings.chunk_refinement_llm_api_key or settings.llm_api_key
+
+
+def _chunk_refinement_llm_timeout() -> int:
+    return settings.chunk_refinement_llm_timeout or settings.llm_timeout
 
 
 async def summarize_text(
@@ -313,7 +335,7 @@ def create_or_update_transcription_chunk(
             existing.refinement_started_at = None
             existing.refinement_completed_at = None
             existing.refinement_status = refinement_status
-            existing.model_name = settings.llm_model_name
+            existing.model_name = chunk_refinement_llm_model_name()
         db.commit()
         db.refresh(existing)
         return existing
@@ -327,7 +349,7 @@ def create_or_update_transcription_chunk(
         raw_text=raw_text,
         raw_segments=raw_segments,
         refinement_status=refinement_status,
-        model_name=settings.llm_model_name,
+        model_name=chunk_refinement_llm_model_name(),
     )
     db.add(chunk)
     db.commit()
@@ -384,7 +406,7 @@ def claim_pending_chunk_refinements(db: Session, limit: int = 1) -> list[uuid.UU
         chunk.refinement_status = ChunkRefinementStatus.PROCESSING
         chunk.refinement_started_at = now
         chunk.error_message = None
-        chunk.model_name = settings.llm_model_name
+        chunk.model_name = chunk_refinement_llm_model_name()
         claimed_ids.append(chunk.id)
 
     db.commit()
@@ -474,6 +496,24 @@ async def process_chunk_refinement(db: Session, chunk: TranscriptionChunk) -> bo
             chunk.refinement_started_at = utc_now()
             db.commit()
 
+        model_name = chunk_refinement_llm_model_name()
+        chunk.model_name = model_name
+        max_input_chars = settings.llm_chunk_refinement_max_input_chars
+        if max_input_chars > 0 and len(raw_text) > max_input_chars:
+            chunk.refined_text = raw_text
+            chunk.token_usage = {
+                "source": "chunk_refinement",
+                "skipped": True,
+                "skip_reason": "input_too_long",
+                "input_chars": len(raw_text),
+                "max_input_chars": max_input_chars,
+            }
+            chunk.refinement_status = ChunkRefinementStatus.COMPLETED
+            chunk.refinement_completed_at = utc_now()
+            chunk.error_message = None
+            db.commit()
+            return True
+
         job = chunk.transcription_job
         audio_file = job.audio_file if job else None
         prompt_context = {
@@ -482,15 +522,18 @@ async def process_chunk_refinement(db: Session, chunk: TranscriptionChunk) -> bo
             "start_time": _chunk_time(chunk.start_seconds),
             "end_time": _chunk_time(chunk.end_seconds),
             "previous_context": _previous_chunk_context(db, chunk),
-            "text": _limit_chars(raw_text, settings.llm_chunk_refinement_max_input_chars),
+            "text": raw_text,
         }
         prompt = _render_user_prompt(CHUNK_REFINEMENT_USER_PROMPT_TEMPLATE, prompt_context)
         result = await call_llm_api_with_metadata(
             prompt,
             CHUNK_REFINEMENT_SYSTEM_PROMPT,
-            model=chunk.model_name,
-            temperature=0.1,
+            model=model_name,
+            temperature=settings.chunk_refinement_llm_temperature,
             max_tokens=settings.llm_chunk_refinement_max_output_tokens,
+            api_base=_chunk_refinement_llm_api_base_url(),
+            api_key=_chunk_refinement_llm_api_key(),
+            timeout=_chunk_refinement_llm_timeout(),
         )
 
         chunk.refined_text = result.content.strip()

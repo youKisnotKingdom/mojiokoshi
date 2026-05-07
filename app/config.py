@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     debug: bool = False
     secret_key: str
     allowed_hosts: str = "localhost,127.0.0.1,::1"
+    show_next_actions: bool = False
 
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":
@@ -62,6 +63,11 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 8192
     llm_temperature: float = 0.7
     llm_timeout: int = 300
+    chunk_refinement_llm_api_base_url: str = ""
+    chunk_refinement_llm_api_key: str = ""
+    chunk_refinement_llm_model_name: str = ""
+    chunk_refinement_llm_temperature: float = 0.1
+    chunk_refinement_llm_timeout: int = 0
 
     # Transcription
     whisper_model_size: str = "medium"
@@ -87,6 +93,7 @@ class Settings(BaseSettings):
     worker_chunk_refinement_stale_timeout_seconds: int = 1800
     worker_summary_stale_timeout_seconds: int = 1800
     worker_speaker_diarization_stale_timeout_seconds: int = 14400
+    worker_cleanup_interval_seconds: int = 3600
     auto_llm_prompt_template_names: str = "文字起こし整形"
     enable_chunk_llm_refinement: bool = True
     llm_chunk_refinement_max_input_chars: int = 12000

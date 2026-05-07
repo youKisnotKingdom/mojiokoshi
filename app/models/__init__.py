@@ -11,6 +11,7 @@ from app.models.transcription import (
 )
 from app.models.recording import RecordingSession, RecordingChunk, RecordingStatus
 from app.models.summary import Summary, SummaryStatus, PromptTemplate
+from app.models.app_setting import AppSetting
 
 __all__ = [
     "User",
@@ -29,4 +30,5 @@ __all__ = [
     "Summary",
     "SummaryStatus",
     "PromptTemplate",
+    "AppSetting",
 ]

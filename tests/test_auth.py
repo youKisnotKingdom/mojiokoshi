@@ -26,7 +26,7 @@ class TestLoginPage:
         assert response.status_code == 302
         assert response.headers["location"] == "/transcription/upload"
 
-    def test_login_page_allows_ldap_identifier_when_enabled(self, client, monkeypatch):
+    def test_login_page_keeps_six_digit_user_id_input_when_ldap_enabled(self, client, monkeypatch):
         from app.routers import auth as auth_router
 
         monkeypatch.setattr(auth_router.settings, "ldap_enabled", True)
@@ -34,9 +34,10 @@ class TestLoginPage:
         response = client.get("/auth/login")
 
         assert response.status_code == 200
-        assert "ユーザーID / LDAP ID" in response.text
-        assert 'maxlength="255"' in response.text
-        assert 'pattern="\\d{6}"' not in response.text
+        assert "ユーザーID / LDAP ID" not in response.text
+        assert "ユーザーID" in response.text
+        assert 'maxlength="6"' in response.text
+        assert 'pattern="\\d{6}"' in response.text
 
 
 class TestLogin:

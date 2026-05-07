@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -16,6 +17,7 @@ from app.models import (
     AudioSource,
     ChunkRefinementStatus,
     PromptTemplate,
+    RecordingSession,
     SpeakerDiarizationStatus,
     Summary,
     SummaryStatus,
@@ -291,6 +293,18 @@ def _attachment_headers(filename: str) -> dict[str, str]:
     }
 
 
+def _audio_file_available(audio_file: AudioFile | None) -> bool:
+    if audio_file is None or audio_file.is_deleted:
+        return False
+    if audio_file.expires_at is not None:
+        expires_at = audio_file.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= utc_now():
+            return False
+    return Path(audio_file.file_path).is_file()
+
+
 def _get_user_job(
     db: Session,
     job_id: uuid.UUID,
@@ -363,8 +377,6 @@ async def upload_file(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     file: Annotated[UploadFile, File()],
-    engine: Annotated[str, Form()] = settings.default_transcription_engine,
-    model_size: Annotated[str, Form()] = settings.whisper_model_size,
     language: Annotated[str | None, Form()] = settings.whisper_language,
     enable_speaker_diarization: Annotated[str | None, Form()] = None,
     csrf_token: Annotated[str, Form()] = "",
@@ -438,11 +450,11 @@ async def upload_file(
 
     # Create transcription job
     try:
-        transcription_engine = TranscriptionEngine(engine)
-    except ValueError:
         transcription_engine = TranscriptionEngine(settings.default_transcription_engine)
+    except ValueError:
+        transcription_engine = TranscriptionEngine.PARAKEET_JA
 
-    effective_model_size = model_size
+    effective_model_size = settings.whisper_model_size
     if transcription_engine == TranscriptionEngine.PARAKEET_JA:
         effective_model_size = "parakeet-tdt_ctc-0.6b-ja"
     effective_language = language if language else None
@@ -527,6 +539,12 @@ async def job_detail_page(
 
     history_url = _history_url_for_source(job.audio_file.source if job.audio_file else None)
     speaker_blocks = build_speaker_blocks(job.result_segments if isinstance(job.result_segments, list) else None)
+    audio_available = _audio_file_available(job.audio_file)
+    audio_is_video = bool(
+        audio_available
+        and job.audio_file
+        and (job.audio_file.mime_type or "").startswith("video/")
+    )
 
     return templates.TemplateResponse(
         "transcription/job_detail.html",
@@ -554,6 +572,9 @@ async def job_detail_page(
             "history_url": history_url,
             "speaker_blocks": speaker_blocks,
             "speaker_text": transcript_output.build_speaker_text(job),
+            "audio_available": audio_available,
+            "audio_is_video": audio_is_video,
+            "show_next_actions": settings.show_next_actions,
             "speaker_diarization_requested": job.enable_speaker_diarization,
             "speaker_diarization_enabled": settings.enable_speaker_diarization,
         },
@@ -574,6 +595,7 @@ async def llm_processing_progress_partial(
     chunk_refinement_stats = _chunk_refinement_stats(db, job_id)
     summary_processing_stats = _summary_processing_stats(summaries)
     progressive_refined_chunks = _progressive_refined_chunks(job)
+    audio_available = _audio_file_available(job.audio_file)
     return templates.TemplateResponse(
         "transcription/partials/llm_processing_progress.html",
         {
@@ -594,7 +616,29 @@ async def llm_processing_progress_partial(
             "auto_llm_processing_enabled": _auto_llm_processing_enabled(),
             "auto_llm_templates_available": auto_llm_templates_available,
             "auto_llm_template_names": _auto_llm_template_names(),
+            "audio_available": audio_available,
+            "show_next_actions": settings.show_next_actions,
         },
+    )
+
+
+@router.get("/job/{job_id}/audio")
+async def stream_job_audio(
+    job_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Stream the source audio/video for timestamp review while the file is retained."""
+    job = _get_user_job(db, job_id, current_user)
+    audio_file = job.audio_file
+    if not _audio_file_available(audio_file):
+        raise HTTPException(status_code=404, detail="音声ファイルは利用できません")
+
+    return FileResponse(
+        Path(audio_file.file_path),
+        media_type=audio_file.mime_type or "application/octet-stream",
+        filename=audio_file.original_filename,
+        content_disposition_type="inline",
     )
 
 
@@ -690,7 +734,7 @@ async def delete_job(
 
     redirect_url = next_url if _is_safe_internal_url(next_url) else _history_url_for_source(job.audio_file.source if job.audio_file else None)
 
-    # Delete associated audio file (cascades to job and summaries)
+    # Delete associated audio file (cascades to job, chunks, and summaries).
     if job.audio_file:
         audio_file = job.audio_file
         # Try to remove the actual file
@@ -700,6 +744,9 @@ async def delete_job(
                 os.remove(audio_file.file_path)
         except OSError:
             pass
+        db.query(RecordingSession).filter(RecordingSession.audio_file_id == audio_file.id).delete(
+            synchronize_session=False
+        )
         db.delete(audio_file)
     else:
         db.delete(job)

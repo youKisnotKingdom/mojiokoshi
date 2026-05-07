@@ -27,4 +27,5 @@ class AudioFileResponse(AudioFileBase):
     duration_display: str
     created_at: datetime
     expires_at: datetime | None
+    retention_days_remaining: int | None
     is_deleted: bool
