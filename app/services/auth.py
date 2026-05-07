@@ -130,14 +130,31 @@ def _get_or_create_ldap_user(
     return user
 
 
+def _authenticate_linked_ldap_user(db: Session, user: User, password: str) -> User | None:
+    if (
+        not user.is_active
+        or user.external_auth_provider != "ldap"
+        or not user.external_auth_id
+    ):
+        return None
+
+    ldap_user = ldap_auth.authenticate_ldap_user(user.external_auth_id, password)
+    if not ldap_user:
+        return None
+    return _get_or_create_ldap_user(db, ldap_user)
+
+
 def authenticate_user(db: Session, user_id: str, password: str) -> User | None:
     """Authenticate a user and return the user object if successful."""
     user_id = user_id.strip()
     user = get_user_by_user_id(db, user_id) if user_id.isdigit() and len(user_id) == 6 else None
-    if user and user.is_active and verify_password(password, user.password_hash):
-        user.last_login_at = utc_now()
-        db.commit()
-        return user
+    if user:
+        if user.external_auth_provider == "ldap":
+            return _authenticate_linked_ldap_user(db, user, password)
+        if user.is_active and verify_password(password, user.password_hash):
+            user.last_login_at = utc_now()
+            db.commit()
+            return user
 
     ldap_user = ldap_auth.authenticate_ldap_user(user_id, password)
     if ldap_user:
