@@ -10,7 +10,10 @@
                   onsubmit="return confirm('このジョブと音声ファイルを削除しますか？この操作は元に戻せません。')">
                 <input type="hidden" name="csrf_token" value="{{ generate_csrf_token() }}">
                 <input type="hidden" name="next_url" value="{{ history_url }}">
-                <button type="submit" class="text-sm text-red-600 hover:text-red-700">
+                <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M10 11v6M14 11v6M9 7l1-2h4l1 2m-8 0 1 13h8l1-13"></path>
+                    </svg>
                     削除
                 </button>
             </form>
