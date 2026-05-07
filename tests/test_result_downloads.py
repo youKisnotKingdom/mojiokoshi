@@ -14,6 +14,8 @@ from app.models import (
     TranscriptionEngine,
     TranscriptionJob,
     TranscriptionStatus,
+    User,
+    UserRole,
 )
 from app.time_utils import utc_now
 
@@ -60,6 +62,22 @@ def _make_source_file(db, job: TranscriptionJob, tmp_path, *, mime_type: str = "
     db.commit()
 
 
+def _other_user(db) -> User:
+    from app.services.auth import get_password_hash
+
+    user = User(
+        user_id="000003",
+        password_hash=get_password_hash("OtherPass1"),
+        display_name="Guest User",
+        role=UserRole.USER,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def test_job_detail_shows_download_and_summary_prompt_controls(user_client, db, regular_user):
     job = _completed_job(db, regular_user.id)
 
@@ -95,6 +113,81 @@ def test_job_detail_shows_download_and_summary_prompt_controls(user_client, db, 
     assert "max-h-96" not in response.text
     assert "captureLlmProgressScrollState" in response.text
     assert "restoreLlmProgressScrollState" in response.text
+
+
+def test_logged_in_user_can_view_other_users_visible_job(user_client, db, tmp_path):
+    other = _other_user(db)
+    job = _completed_job(db, other.id)
+    _make_source_file(db, job, tmp_path)
+    summary = Summary(
+        transcription_job_id=job.id,
+        user_id=other.id,
+        status=SummaryStatus.COMPLETED,
+        result_text="# 共有できる結果\n本文",
+        model_name="test-model",
+    )
+    db.add(summary)
+    db.commit()
+    db.refresh(summary)
+
+    detail_response = user_client.get(f"/transcription/job/{job.id}")
+    audio_response = user_client.get(f"/transcription/job/{job.id}/audio")
+    transcript_response = user_client.get(f"/transcription/job/{job.id}/download/txt")
+    summary_response = user_client.get(f"/summary/job/{summary.id}")
+    summary_download_response = user_client.get(f"/summary/job/{summary.id}/download/md")
+
+    assert detail_response.status_code == 200
+    assert "Guest User" in detail_response.text
+    assert f"/transcription/job/{job.id}/delete" not in detail_response.text
+    assert audio_response.status_code == 200
+    assert transcript_response.status_code == 200
+    assert summary_response.status_code == 200
+    assert "# 共有できる結果" in summary_response.text
+    assert summary_download_response.status_code == 200
+
+
+def test_logged_in_user_cannot_delete_other_users_job(user_client, db):
+    other = _other_user(db)
+    job = _completed_job(db, other.id)
+    csrf_match = re.search(r'name="csrf_token" value="([^"]+)"', user_client.get("/transcription/upload").text)
+    csrf = csrf_match.group(1)
+
+    response = user_client.post(
+        f"/transcription/job/{job.id}/delete",
+        data={"csrf_token": csrf},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 404
+    assert db.get(TranscriptionJob, job.id) is not None
+
+
+def test_logged_in_user_cannot_start_llm_for_other_users_job(user_client, db):
+    other = _other_user(db)
+    job = _completed_job(db, other.id)
+
+    response = user_client.post(
+        "/summary/api/create",
+        json={"transcription_job_id": str(job.id)},
+    )
+
+    assert response.status_code == 404
+
+
+def test_admin_can_delete_other_users_job(admin_client, db):
+    other = _other_user(db)
+    job = _completed_job(db, other.id)
+    csrf_match = re.search(r'name="csrf_token" value="([^"]+)"', admin_client.get(f"/transcription/job/{job.id}").text)
+    csrf = csrf_match.group(1)
+
+    response = admin_client.post(
+        f"/transcription/job/{job.id}/delete",
+        data={"csrf_token": csrf},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert db.get(TranscriptionJob, job.id) is None
 
 
 def test_job_detail_can_show_next_actions_when_enabled(user_client, db, regular_user):
@@ -165,6 +258,26 @@ def test_history_shows_audio_retention_remaining(user_client, db, regular_user):
     assert ">表示<" not in response.text
     assert "parakeet_ja" not in response.text
     assert "parakeet-tdt_ctc-0.6b-ja" not in response.text
+    assert "登録者" in response.text
+    assert "Test User" in response.text
+
+
+def test_history_defaults_to_current_user_and_can_search_all(user_client, db, regular_user):
+    _completed_job(db, regular_user.id)
+    other = _other_user(db)
+    other_job = _completed_job(db, other.id)
+    other_job.audio_file.original_filename = "shared-meeting.wav"
+    db.commit()
+
+    own_response = user_client.get("/history/uploads")
+    all_search_response = user_client.get("/history/uploads?scope=all&q=shared")
+
+    assert own_response.status_code == 200
+    assert "seminar.mp4" in own_response.text
+    assert "shared-meeting.wav" not in own_response.text
+    assert all_search_response.status_code == 200
+    assert "shared-meeting.wav" in all_search_response.text
+    assert "Guest User" in all_search_response.text
 
 
 def test_job_detail_shows_transcription_chunks_with_time_badges(user_client, db, regular_user):

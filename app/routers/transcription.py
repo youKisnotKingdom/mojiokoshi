@@ -30,6 +30,10 @@ from app.models.user import User
 from app.schemas.transcription import TranscriptionJobResponse
 from app.services import storage, summarization, transcript_output
 from app.services.speaker_diarization import build_speaker_blocks
+from app.services.transcription_access import (
+    can_manage_transcription_job,
+    can_view_transcription_job,
+)
 from app.templating import templates
 from app.time_utils import utc_now
 
@@ -312,12 +316,15 @@ def _get_user_job(
 ) -> TranscriptionJob:
     stmt = (
         select(TranscriptionJob)
-        .options(joinedload(TranscriptionJob.chunks))
+        .options(
+            joinedload(TranscriptionJob.audio_file),
+            joinedload(TranscriptionJob.chunks),
+            joinedload(TranscriptionJob.user),
+        )
         .where(TranscriptionJob.id == job_id)
-        .where(TranscriptionJob.user_id == current_user.id)
     )
     job = db.execute(stmt).unique().scalar_one_or_none()
-    if not job:
+    if not can_view_transcription_job(current_user, job):
         raise HTTPException(status_code=404, detail="ジョブが見つかりません")
     return job
 
@@ -575,6 +582,7 @@ async def job_detail_page(
             "audio_available": audio_available,
             "audio_is_video": audio_is_video,
             "show_next_actions": settings.show_next_actions,
+            "can_manage_job": can_manage_transcription_job(current_user, job),
             "speaker_diarization_requested": job.enable_speaker_diarization,
             "speaker_diarization_enabled": settings.enable_speaker_diarization,
         },
@@ -618,6 +626,7 @@ async def llm_processing_progress_partial(
             "auto_llm_template_names": _auto_llm_template_names(),
             "audio_available": audio_available,
             "show_next_actions": settings.show_next_actions,
+            "can_manage_job": can_manage_transcription_job(current_user, job),
         },
     )
 
@@ -691,12 +700,12 @@ async def job_progress_partial(
     """HTMX partial for job progress."""
     stmt = (
         select(TranscriptionJob)
+        .options(joinedload(TranscriptionJob.audio_file))
         .where(TranscriptionJob.id == job_id)
-        .where(TranscriptionJob.user_id == current_user.id)
     )
     job = db.execute(stmt).scalar_one_or_none()
 
-    if not job:
+    if not can_view_transcription_job(current_user, job):
         raise HTTPException(status_code=404, detail="ジョブが見つかりません")
 
     return templates.TemplateResponse(
@@ -725,11 +734,11 @@ async def delete_job(
 
     stmt = (
         select(TranscriptionJob)
+        .options(joinedload(TranscriptionJob.audio_file))
         .where(TranscriptionJob.id == job_id)
-        .where(TranscriptionJob.user_id == current_user.id)
     )
     job = db.execute(stmt).scalar_one_or_none()
-    if not job:
+    if not can_manage_transcription_job(current_user, job):
         raise HTTPException(status_code=404, detail="ジョブが見つかりません")
 
     redirect_url = next_url if _is_safe_internal_url(next_url) else _history_url_for_source(job.audio_file.source if job.audio_file else None)
@@ -785,11 +794,10 @@ async def get_job(
     stmt = (
         select(TranscriptionJob)
         .where(TranscriptionJob.id == job_id)
-        .where(TranscriptionJob.user_id == current_user.id)
     )
     job = db.execute(stmt).scalar_one_or_none()
 
-    if not job:
+    if not can_view_transcription_job(current_user, job):
         raise HTTPException(status_code=404, detail="ジョブが見つかりません")
 
     return TranscriptionJobResponse.model_validate(job)

@@ -21,6 +21,10 @@ from app.schemas.summary import (
     SummaryResponse,
 )
 from app.services import summarization
+from app.services.transcription_access import (
+    can_manage_transcription_job,
+    can_view_transcription_job,
+)
 from app.templating import templates
 
 settings = get_settings()
@@ -31,6 +35,33 @@ def _attachment_headers(filename: str) -> dict[str, str]:
     return {
         "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
     }
+
+
+def _get_visible_summary(db: Session, summary_id: uuid.UUID, current_user: User) -> Summary:
+    stmt = (
+        select(Summary)
+        .options(
+            joinedload(Summary.transcription_job).joinedload(TranscriptionJob.audio_file),
+            joinedload(Summary.prompt_template),
+        )
+        .where(Summary.id == summary_id)
+    )
+    summary = db.execute(stmt).unique().scalar_one_or_none()
+    if not summary or not can_view_transcription_job(current_user, summary.transcription_job):
+        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
+    return summary
+
+
+def _get_manageable_transcription(
+    db: Session,
+    transcription_id: uuid.UUID,
+    current_user: User,
+) -> TranscriptionJob:
+    stmt = select(TranscriptionJob).where(TranscriptionJob.id == transcription_id)
+    transcription = db.execute(stmt).scalar_one_or_none()
+    if not can_manage_transcription_job(current_user, transcription):
+        raise HTTPException(status_code=404, detail="文字起こしジョブが見つかりません")
+    return transcription
 
 
 @router.get("/templates", response_class=HTMLResponse)
@@ -64,19 +95,7 @@ async def summary_detail_page(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Summary detail page."""
-    stmt = (
-        select(Summary)
-        .options(
-            joinedload(Summary.transcription_job).joinedload(TranscriptionJob.audio_file),
-            joinedload(Summary.prompt_template),
-        )
-        .where(Summary.id == job_id)
-        .where(Summary.user_id == current_user.id)
-    )
-    summary = db.execute(stmt).unique().scalar_one_or_none()
-
-    if not summary:
-        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
+    summary = _get_visible_summary(db, job_id, current_user)
 
     return templates.TemplateResponse(
         "summary/detail.html",
@@ -98,15 +117,7 @@ async def download_summary_result(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Download a completed LLM processing result as Markdown/text."""
-    stmt = (
-        select(Summary)
-        .options(joinedload(Summary.transcription_job).joinedload(TranscriptionJob.audio_file))
-        .where(Summary.id == job_id)
-        .where(Summary.user_id == current_user.id)
-    )
-    summary = db.execute(stmt).unique().scalar_one_or_none()
-    if not summary:
-        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
+    summary = _get_visible_summary(db, job_id, current_user)
     if summary.status != SummaryStatus.COMPLETED or not summary.result_text:
         raise HTTPException(status_code=400, detail="LLM処理が完了していません")
 
@@ -143,15 +154,7 @@ async def create_summary(
 ):
     """Create a new LLM processing job for a transcription job."""
     # Verify transcription exists and is completed
-    stmt = (
-        select(TranscriptionJob)
-        .where(TranscriptionJob.id == data.transcription_job_id)
-        .where(TranscriptionJob.user_id == current_user.id)
-    )
-    transcription = db.execute(stmt).scalar_one_or_none()
-
-    if not transcription:
-        raise HTTPException(status_code=404, detail="文字起こしジョブが見つかりません")
+    transcription = _get_manageable_transcription(db, data.transcription_job_id, current_user)
 
     if transcription.status != TranscriptionStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="文字起こしが完了していません")
@@ -182,15 +185,7 @@ async def summarize_transcription(
     if not verify_csrf_token(csrf_token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRFトークンが無効です")
     # Verify transcription exists and is completed
-    stmt = (
-        select(TranscriptionJob)
-        .where(TranscriptionJob.id == transcription_id)
-        .where(TranscriptionJob.user_id == current_user.id)
-    )
-    transcription = db.execute(stmt).scalar_one_or_none()
-
-    if not transcription:
-        raise HTTPException(status_code=404, detail="文字起こしジョブが見つかりません")
+    transcription = _get_manageable_transcription(db, transcription_id, current_user)
 
     if transcription.status != TranscriptionStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="文字起こしが完了していません")
@@ -221,15 +216,7 @@ async def get_summary(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Get an LLM processing job by ID."""
-    stmt = (
-        select(Summary)
-        .where(Summary.id == job_id)
-        .where(Summary.user_id == current_user.id)
-    )
-    summary = db.execute(stmt).scalar_one_or_none()
-
-    if not summary:
-        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
+    summary = _get_visible_summary(db, job_id, current_user)
 
     return SummaryResponse.model_validate(summary)
 
@@ -242,15 +229,7 @@ async def summary_progress_partial(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """HTMX partial for LLM processing progress."""
-    stmt = (
-        select(Summary)
-        .where(Summary.id == job_id)
-        .where(Summary.user_id == current_user.id)
-    )
-    summary = db.execute(stmt).scalar_one_or_none()
-
-    if not summary:
-        raise HTTPException(status_code=404, detail="LLM処理が見つかりません")
+    summary = _get_visible_summary(db, job_id, current_user)
 
     return templates.TemplateResponse(
         "summary/partials/progress.html",
