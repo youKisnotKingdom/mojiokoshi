@@ -135,6 +135,27 @@ class TestUpdateUser:
         db.refresh(user)
         assert user.display_name == "LDAP Hanako"
 
+    def test_admin_can_manage_ldap_user_role_in_app(self, admin_client, db):
+        from app.models.user import UserRole
+
+        user = create_ldap_user(db)
+        csrf = get_csrf_token(admin_client, f"/admin/users/{user.user_id}")
+
+        response = admin_client.post(
+            f"/admin/users/{user.user_id}",
+            data={
+                "display_name": "Manual Name",
+                "role": "admin",
+                "is_active": "true",
+                "csrf_token": csrf,
+            },
+        )
+
+        assert response.status_code == 200
+        db.refresh(user)
+        assert user.display_name == "LDAP Hanako"
+        assert user.role == UserRole.ADMIN
+
     def test_ldap_user_password_reset_is_rejected(self, admin_client, db):
         user = create_ldap_user(db)
         csrf = get_csrf_token(admin_client, f"/admin/users/{user.user_id}")

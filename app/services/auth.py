@@ -101,14 +101,13 @@ def _ldap_default_role() -> UserRole:
 def _get_or_create_ldap_user(
     db: Session,
     ldap_user: ldap_auth.LDAPAuthenticatedUser,
-) -> User:
+) -> User | None:
     user = get_user_by_external_auth(db, "ldap", ldap_user.external_id)
-    role = UserRole.ADMIN if ldap_user.is_admin else _ldap_default_role()
 
     if user:
+        if not user.is_active:
+            return None
         user.display_name = ldap_user.display_name or user.display_name
-        user.role = role
-        user.is_active = True
         user.last_login_at = utc_now()
         db.commit()
         db.refresh(user)
@@ -120,7 +119,7 @@ def _get_or_create_ldap_user(
         external_auth_id=ldap_user.external_id,
         password_hash=_new_unlinked_password_hash(),
         display_name=ldap_user.display_name or ldap_user.external_id,
-        role=role,
+        role=_ldap_default_role(),
         is_active=True,
         last_login_at=utc_now(),
     )

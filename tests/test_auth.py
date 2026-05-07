@@ -144,7 +144,7 @@ class TestLogin:
             external_auth_id="taro",
             password_hash=get_password_hash("local-password-should-not-work"),
             display_name="Old Name",
-            role=UserRole.USER,
+            role=UserRole.ADMIN,
             is_active=True,
         )
         db.add(linked_user)
@@ -179,6 +179,7 @@ class TestLogin:
         db.refresh(linked_user)
         assert linked_user.display_name == "LDAP Taro"
         assert linked_user.external_auth_id == "taro"
+        assert linked_user.role == UserRole.ADMIN
 
     def test_ldap_linked_user_rejects_local_password(self, client, db, monkeypatch):
         from app.models.user import User, UserRole
@@ -213,7 +214,7 @@ class TestLogin:
 
         assert response.status_code == 401
 
-    def test_ldap_login_can_grant_admin_role(self, client, db, monkeypatch):
+    def test_ldap_login_uses_app_default_role_not_ldap_admin_flag(self, client, db, monkeypatch):
         from app.models.user import UserRole
         from app.services import auth as auth_service
         from app.services.ldap_auth import LDAPAuthenticatedUser
@@ -239,7 +240,50 @@ class TestLogin:
         assert response.status_code == 302
         user = auth_service.get_user_by_external_auth(db, "ldap", "admin-ldap")
         assert user is not None
-        assert user.role == UserRole.ADMIN
+        assert user.role == UserRole.USER
+
+    def test_inactive_ldap_linked_user_cannot_login_by_ldap_id(self, client, db, monkeypatch):
+        from app.models.user import User, UserRole
+        from app.services import auth as auth_service
+        from app.services.auth import get_password_hash
+        from app.services.ldap_auth import LDAPAuthenticatedUser
+
+        linked_user = User(
+            user_id="123456",
+            external_auth_provider="ldap",
+            external_auth_id="taro",
+            password_hash=get_password_hash("local-password-should-not-work"),
+            display_name="LDAP Taro",
+            role=UserRole.ADMIN,
+            is_active=False,
+        )
+        db.add(linked_user)
+        db.commit()
+
+        monkeypatch.setattr(auth_service.settings, "ldap_enabled", True)
+        monkeypatch.setattr(
+            auth_service.ldap_auth,
+            "authenticate_ldap_user",
+            lambda user_id, password: LDAPAuthenticatedUser(
+                external_id="taro",
+                display_name="LDAP Taro",
+                is_admin=True,
+            )
+            if user_id == "taro" and password == "ldap-pass"
+            else None,
+        )
+
+        csrf = get_csrf_token(client)
+        response = client.post(
+            "/auth/login",
+            data={"user_id": "taro", "password": "ldap-pass", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 401
+        db.refresh(linked_user)
+        assert linked_user.role == UserRole.ADMIN
+        assert linked_user.is_active is False
 
 
 class TestLogout:
