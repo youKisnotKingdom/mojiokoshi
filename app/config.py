@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     default_transcription_engine: str = "parakeet_ja"
     parakeet_chunk_seconds: int = 300
     parakeet_sample_rate: int = 16000
+    audio_preprocessing_mode: str = "light"
     enable_speaker_diarization: bool = False
     speaker_diarization_model_id: str = "pyannote/speaker-diarization-community-1"
     speaker_diarization_model_path: str = ""

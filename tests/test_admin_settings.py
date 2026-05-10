@@ -47,6 +47,7 @@ class TestAdminSettings:
         assert "画面表示" in response.text
         assert "SHOW_NEXT_ACTIONS" in response.text
         assert "LLM_API_BASE_URL" in response.text
+        assert "AUDIO_PREPROCESSING_MODE" in response.text
         assert "プロンプト" in response.text
 
     def test_regular_user_cannot_view_settings(self, user_client):

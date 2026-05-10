@@ -29,6 +29,21 @@ _whisper_models: dict[str, object] = {}
 _parakeet_models: dict[str, object] = {}
 
 PARAKEET_JA_REPO_ID = "nvidia/parakeet-tdt_ctc-0.6b-ja"
+FASTER_WHISPER_PREPROCESS_SAMPLE_RATE = 16000
+AUDIO_PREPROCESSING_FILTERS: dict[str, list[str]] = {
+    "off": [],
+    "light": [
+        "highpass=f=80",
+        "lowpass=f=7600",
+        "dynaudnorm=f=250:g=8:p=0.95",
+    ],
+    "denoise": [
+        "highpass=f=80",
+        "lowpass=f=7600",
+        "afftdn=nf=-25",
+        "dynaudnorm=f=250:g=8:p=0.95",
+    ],
+}
 
 
 def get_whisper_model(model_size: str = "medium", device: str = "auto"):
@@ -95,6 +110,35 @@ def _run_media_command(command: list[str]) -> None:
     subprocess.run(command, check=True, capture_output=True, text=True)
 
 
+def _audio_preprocessing_filters() -> list[str]:
+    mode = (settings.audio_preprocessing_mode or "off").strip().lower()
+    filters = AUDIO_PREPROCESSING_FILTERS.get(mode)
+    if filters is None:
+        logger.warning("Unknown audio preprocessing mode `%s`; using off", mode)
+        return []
+    return filters
+
+
+def _prepare_audio_for_asr(source: Path, output_path: Path, sample_rate: int) -> Path:
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(source),
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "-vn",
+    ]
+    filters = _audio_preprocessing_filters()
+    if filters:
+        command.extend(["-af", ",".join(filters)])
+    command.extend(["-c:a", "pcm_s16le", str(output_path)])
+    _run_media_command(command)
+    return output_path
+
+
 def _ffprobe_duration(audio_path: Path) -> float:
     result = subprocess.run(
         [
@@ -133,21 +177,7 @@ def _ensure_audio_duration(db: Session, job: TranscriptionJob, audio_path: Path)
 
 
 def _normalize_audio_for_parakeet(source: Path, output_path: Path) -> Path:
-    _run_media_command(
-        [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(source),
-            "-ac",
-            "1",
-            "-ar",
-            str(settings.parakeet_sample_rate),
-            "-vn",
-            str(output_path),
-        ]
-    )
-    return output_path
+    return _prepare_audio_for_asr(source, output_path, settings.parakeet_sample_rate)
 
 
 def _split_audio_for_parakeet(source: Path, output_dir: Path) -> list[Path]:
@@ -217,27 +247,42 @@ def transcribe_audio_sync(
     Yields segments as they are processed.
     """
     model = get_whisper_model(model_size, device)
+    source_path = Path(audio_path)
 
-    segments, info = model.transcribe(
-        audio_path,
-        language=language,
-        beam_size=5,
-        word_timestamps=True,
-        vad_filter=True,
-    )
+    def _yield_segments(input_path: str) -> Generator[dict, None, None]:
+        segments, info = model.transcribe(
+            input_path,
+            language=language,
+            beam_size=5,
+            word_timestamps=True,
+            vad_filter=True,
+        )
 
-    logger.info(f"Detected language: {info.language} (probability: {info.language_probability:.2f})")
+        logger.info(f"Detected language: {info.language} (probability: {info.language_probability:.2f})")
 
-    for segment in segments:
-        yield {
-            "text": segment.text.strip(),
-            "start": segment.start,
-            "end": segment.end,
-            "words": [
-                {"word": w.word, "start": w.start, "end": w.end, "probability": w.probability}
-                for w in (segment.words or [])
-            ],
-        }
+        for segment in segments:
+            yield {
+                "text": segment.text.strip(),
+                "start": segment.start,
+                "end": segment.end,
+                "words": [
+                    {"word": w.word, "start": w.start, "end": w.end, "probability": w.probability}
+                    for w in (segment.words or [])
+                ],
+            }
+
+    if _audio_preprocessing_filters():
+        with tempfile.TemporaryDirectory(prefix="asr-preprocess-") as temp_dir_str:
+            prepared_path = Path(temp_dir_str) / "preprocessed.wav"
+            _prepare_audio_for_asr(
+                source_path,
+                prepared_path,
+                FASTER_WHISPER_PREPROCESS_SAMPLE_RATE,
+            )
+            yield from _yield_segments(str(prepared_path))
+        return
+
+    yield from _yield_segments(audio_path)
 
 
 async def transcribe_audio(

@@ -124,6 +124,7 @@ DEFAULT_TRANSCRIPTION_ENGINE=parakeet_ja
 WORKER_WHISPER_DEVICE=cuda
 ENABLE_REALTIME_TRANSCRIPTION=false
 PARAKEET_CHUNK_SECONDS=300
+AUDIO_PREPROCESSING_MODE=light
 MAX_UPLOAD_SIZE=1073741824
 NGINX_CLIENT_MAX_BODY_SIZE=1g
 
@@ -280,6 +281,7 @@ At runtime, if `SPEAKER_DIARIZATION_MODEL_PATH` exists, the app does not fetch f
 | `LLM_MAX_TOKENS` | 8192 | Max output tokens for final LLM processing |
 | `LLM_TIMEOUT` | 300 | LLM request timeout in seconds |
 | `DEFAULT_TRANSCRIPTION_ENGINE` | parakeet_ja | Default batch transcription engine |
+| `AUDIO_PREPROCESSING_MODE` | light | ASR input preprocessing: `off`, `light`, or `denoise` |
 | `WHISPER_MODEL_SIZE` | medium | faster-whisper fallback / checker model size |
 | `WEB_WHISPER_DEVICE` | cpu | Device used by `web` in Docker |
 | `WORKER_WHISPER_DEVICE` | cuda | Device used by batch worker in Docker |

@@ -281,6 +281,20 @@ EDITABLE_SETTINGS: tuple[RuntimeSettingDefinition, ...] = (
         min_value=1,
     ),
     RuntimeSettingDefinition(
+        "audio_preprocessing_mode",
+        "AUDIO_PREPROCESSING_MODE",
+        "音声前処理",
+        "transcription",
+        "str",
+        "ASR用の一時音声にだけ適用します。off は形式変換のみ、light は帯域整理と音量補正、denoise は軽いノイズ低減も追加します。",
+        choices=(
+            ("off", "なし"),
+            ("light", "軽量補正"),
+            ("denoise", "ノイズ低減あり"),
+        ),
+        required=True,
+    ),
+    RuntimeSettingDefinition(
         "max_upload_size",
         "MAX_UPLOAD_SIZE",
         "最大アップロードサイズ bytes",
