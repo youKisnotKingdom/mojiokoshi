@@ -155,6 +155,27 @@ class TestFileUpload:
         assert job.engine == TranscriptionEngine.PARAKEET_JA
         assert job.model_size == "parakeet-tdt_ctc-0.6b-ja"
 
+    def test_upload_uses_cohere_when_admin_default_is_cohere(self, user_client, db, monkeypatch):
+        from app.routers import transcription as transcription_router
+
+        monkeypatch.setattr(
+            transcription_router.settings,
+            "default_transcription_engine",
+            "cohere_transcribe",
+        )
+
+        csrf = get_csrf_token(user_client)
+        response = user_client.post(
+            "/transcription/upload",
+            data={"csrf_token": csrf},
+            files={"file": ("meeting.mp4", io.BytesIO(b"fake video"), "video/mp4")},
+        )
+
+        assert response.status_code == 200, response.text
+        job = db.execute(select(TranscriptionJob)).scalar_one()
+        assert job.engine == TranscriptionEngine.COHERE_TRANSCRIBE
+        assert job.model_size == "cohere-transcribe-03-2026"
+
 
 class TestDeleteJob:
     def test_delete_job_removes_audio_file_and_related_rows(self, user_client, db, regular_user, tmp_path):

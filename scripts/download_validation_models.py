@@ -14,6 +14,7 @@ ASR 検証用モデルのダウンロードスクリプト
 環境変数:
   HF_HOME                Hugging Face キャッシュ保存先（例: /app/models）
   HF_TOKEN               Hugging Face アクセストークン（gated model 用）
+  HUGGINGFACE_TOKEN      HF_TOKEN 未設定時のフォールバック
   VALIDATION_MODELS      カンマ区切りの alias または repo_id
 """
 from __future__ import annotations
@@ -119,7 +120,7 @@ def download_model(model: dict) -> str:
     if cache_dir:
         kwargs["cache_dir"] = cache_dir
 
-    token = os.environ.get("HF_TOKEN")
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
     if token:
         kwargs["token"] = token
 

@@ -29,9 +29,11 @@ logger = logging.getLogger(__name__)
 _whisper_models: dict[str, object] = {}
 _parakeet_models: dict[str, object] = {}
 _reazon_nemo_models: dict[str, object] = {}
+_cohere_transcribe_models: dict[str, tuple[object, object]] = {}
 
 PARAKEET_JA_REPO_ID = "nvidia/parakeet-tdt_ctc-0.6b-ja"
 REAZON_NEMO_V2_REPO_ID = "reazon-research/reazonspeech-nemo-v2"
+COHERE_TRANSCRIBE_REPO_ID = "CohereLabs/cohere-transcribe-03-2026"
 FASTER_WHISPER_PREPROCESS_SAMPLE_RATE = 16000
 AUDIO_PREPROCESSING_FILTERS: dict[str, list[str]] = {
     "off": [],
@@ -157,6 +159,15 @@ def resolve_cached_model_source(repo_id: str) -> str:
     return repo_id
 
 
+def _huggingface_token() -> str | None:
+    return (
+        os.environ.get("HF_TOKEN")
+        or settings.huggingface_token
+        or os.environ.get("HUGGINGFACE_TOKEN")
+        or None
+    )
+
+
 def get_reazon_nemo_model(device: str = "auto"):
     """Get or create a cached ReazonSpeech NeMo v2 model instance."""
     runtime_device = resolve_runtime_device(device)
@@ -187,11 +198,46 @@ def get_reazon_nemo_model(device: str = "auto"):
     return _reazon_nemo_models[cache_key]
 
 
+def get_cohere_transcribe_model(device: str = "auto") -> tuple[object, object]:
+    """Get or create a cached Cohere Transcribe processor/model pair."""
+    runtime_device = resolve_runtime_device(device)
+    cache_key = f"{COHERE_TRANSCRIBE_REPO_ID}_{runtime_device}"
+    if cache_key not in _cohere_transcribe_models:
+        try:
+            import torch
+            from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+        except ImportError:
+            logger.error("transformers / torch not installed. Cohere Transcribe cannot be loaded.")
+            raise
+
+        model_source = resolve_cached_model_source(COHERE_TRANSCRIBE_REPO_ID)
+        token = _huggingface_token()
+        torch_dtype = torch.bfloat16 if runtime_device.startswith("cuda") else torch.float32
+        processor = AutoProcessor.from_pretrained(
+            model_source,
+            trust_remote_code=True,
+            token=token,
+        )
+        model = AutoModelForSpeechSeq2Seq.from_pretrained(
+            model_source,
+            trust_remote_code=True,
+            torch_dtype=torch_dtype,
+            token=token,
+        ).to(runtime_device)
+        model.eval()
+        _cohere_transcribe_models[cache_key] = (processor, model)
+        logger.info("Loaded Cohere Transcribe model on %s", runtime_device)
+
+    return _cohere_transcribe_models[cache_key]
+
+
 def model_size_for_engine(engine: TranscriptionEngine, fallback_model_size: str) -> str:
     if engine == TranscriptionEngine.PARAKEET_JA:
         return "parakeet-tdt_ctc-0.6b-ja"
     if engine == TranscriptionEngine.REAZON_NEMO_V2:
         return "reazonspeech-nemo-v2"
+    if engine == TranscriptionEngine.COHERE_TRANSCRIBE:
+        return "cohere-transcribe-03-2026"
     return fallback_model_size
 
 
@@ -520,6 +566,50 @@ def transcribe_audio_reazon_nemo_sync(
             chunk_offset += chunk_duration
 
 
+def transcribe_audio_cohere_sync(
+    audio_path: str,
+    language: str | None = None,
+    device: str = "auto",
+) -> Generator[dict, None, None]:
+    """Transcribe audio file using Cohere Transcribe."""
+    runtime_device = resolve_runtime_device(device)
+    processor, model = get_cohere_transcribe_model(runtime_device)
+    source_path = Path(audio_path)
+    cohere_language = language or settings.whisper_language or "ja"
+    with tempfile.TemporaryDirectory(prefix="cohere-transcribe-job-") as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        normalized_path = temp_dir / "normalized.wav"
+        chunks_dir = temp_dir / "chunks"
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+
+        _prepare_audio_for_asr(source_path, normalized_path, 16000)
+        chunks = _split_audio_for_parakeet(normalized_path, chunks_dir)
+
+        chunk_offset = 0.0
+        for chunk_index, chunk_path in enumerate(chunks):
+            texts = model.transcribe(
+                processor=processor,
+                audio_files=[str(chunk_path)],
+                language=cohere_language,
+            )
+            text = str(texts[0] if texts else "").strip()
+            chunk_duration = _ffprobe_duration(chunk_path)
+            chunk_start = chunk_offset
+            chunk_end = chunk_offset + chunk_duration
+            if text:
+                yield {
+                    "text": text,
+                    "start": chunk_start,
+                    "end": chunk_end,
+                    "chunk_index": chunk_index,
+                    "chunk_start": chunk_start,
+                    "chunk_end": chunk_end,
+                    "words": [],
+                    "language": cohere_language,
+                }
+            chunk_offset += chunk_duration
+
+
 def transcribe_batch_job_sync(
     engine: TranscriptionEngine,
     audio_path: str,
@@ -535,13 +625,17 @@ def transcribe_batch_job_sync(
         yield from transcribe_audio_reazon_nemo_sync(audio_path, language=language, device=device)
         return
 
+    if engine == TranscriptionEngine.COHERE_TRANSCRIBE:
+        yield from transcribe_audio_cohere_sync(audio_path, language=language, device=device)
+        return
+
     if engine in (TranscriptionEngine.FASTER_WHISPER, TranscriptionEngine.WHISPER):
         yield from transcribe_audio_sync(audio_path, model_size=model_size, language=language, device=device)
         return
 
     raise ValueError(
         f"Engine `{engine.value}` is not supported by the production worker. "
-        "Use Parakeet JA, Reazon NeMo v2, or Faster Whisper."
+        "Use Parakeet JA, Reazon NeMo v2, Cohere Transcribe, or Faster Whisper."
     )
 
 

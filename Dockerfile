@@ -51,6 +51,7 @@ COPY app ./app
 COPY demo ./demo
 COPY alembic ./alembic
 COPY alembic.ini .
+COPY config ./config
 COPY scripts ./scripts
 COPY static ./static
 

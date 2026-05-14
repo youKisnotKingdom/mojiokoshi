@@ -175,3 +175,80 @@ def test_batch_dispatch_supports_reazon_nemo(monkeypatch):
     )
 
     assert segments == [{"text": "reazon"}]
+
+
+def test_cohere_transcribe_preprocesses_and_chunks(tmp_path, monkeypatch):
+    prepared_paths = []
+    chunk_a = tmp_path / "chunk_0000.wav"
+    chunk_b = tmp_path / "chunk_0001.wav"
+    chunk_a.write_bytes(b"a")
+    chunk_b.write_bytes(b"b")
+
+    def fake_prepare(source, output_path, sample_rate):
+        prepared_paths.append((source, output_path, sample_rate))
+        output_path.write_bytes(b"prepared")
+        return output_path
+
+    class FakeCohereModel:
+        def transcribe(self, *, processor, audio_files, language):
+            assert processor == "processor"
+            assert language == "ja"
+            path = audio_files[0]
+            if path.endswith("chunk_0000.wav"):
+                return ["最初のCohereチャンク"]
+            return ["次のCohereチャンク"]
+
+    monkeypatch.setattr(transcription.settings, "audio_preprocessing_mode", "light")
+    monkeypatch.setattr(transcription, "_prepare_audio_for_asr", fake_prepare)
+    monkeypatch.setattr(transcription, "_split_audio_for_parakeet", lambda *_: [chunk_a, chunk_b])
+    monkeypatch.setattr(transcription, "_ffprobe_duration", lambda path: 5.0)
+    monkeypatch.setattr(transcription, "get_cohere_transcribe_model", lambda device: ("processor", FakeCohereModel()))
+
+    source = tmp_path / "input.mp4"
+    source.write_bytes(b"fake")
+    segments = list(transcription.transcribe_audio_cohere_sync(str(source), language="ja", device="cpu"))
+
+    assert prepared_paths[0][0] == source
+    assert prepared_paths[0][2] == 16000
+    assert segments == [
+        {
+            "text": "最初のCohereチャンク",
+            "start": 0.0,
+            "end": 5.0,
+            "chunk_index": 0,
+            "chunk_start": 0.0,
+            "chunk_end": 5.0,
+            "words": [],
+            "language": "ja",
+        },
+        {
+            "text": "次のCohereチャンク",
+            "start": 5.0,
+            "end": 10.0,
+            "chunk_index": 1,
+            "chunk_start": 5.0,
+            "chunk_end": 10.0,
+            "words": [],
+            "language": "ja",
+        },
+    ]
+
+
+def test_batch_dispatch_supports_cohere_transcribe(monkeypatch):
+    monkeypatch.setattr(
+        transcription,
+        "transcribe_audio_cohere_sync",
+        lambda *args, **kwargs: iter([{"text": "cohere"}]),
+    )
+
+    segments = list(
+        transcription.transcribe_batch_job_sync(
+            TranscriptionEngine.COHERE_TRANSCRIBE,
+            "input.wav",
+            "cohere-transcribe-03-2026",
+            "ja",
+            "cpu",
+        )
+    )
+
+    assert segments == [{"text": "cohere"}]

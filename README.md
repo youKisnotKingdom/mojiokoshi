@@ -7,7 +7,7 @@ Audio transcription and summarization web application for on-premises deployment
 - File upload transcription as the primary production path
 - Optional browser recording with real-time transcription (feature flag)
 - File upload support (MP3, WAV, M4A, FLAC, OGG, WebM, etc.)
-- Batch transcription using ReazonSpeech NeMo v2 by default, with Parakeet JA and faster-whisper alternatives
+- Batch transcription using ReazonSpeech NeMo v2 by default, with Cohere Transcribe, Parakeet JA, and faster-whisper alternatives
 - LLM-powered summarization via local OpenAI-compatible API
 - Multi-user support with admin/user roles
 - Automatic audio file cleanup
@@ -18,7 +18,7 @@ Audio transcription and summarization web application for on-premises deployment
 - **Frontend**: HTMX + Jinja2 + Tailwind CSS
 - **Database**: PostgreSQL
 - **Background Worker**: In-process polling worker
-- **Transcription**: Parakeet JA (NeMo) / ReazonSpeech NeMo v2 / faster-whisper fallback
+- **Transcription**: ReazonSpeech NeMo v2 / Cohere Transcribe / Parakeet JA (NeMo) / faster-whisper fallback
 - **Summarization**: Local LLM server (vLLM, Ollama, etc.)
 
 ## Development Setup
@@ -280,7 +280,7 @@ At runtime, if `SPEAKER_DIARIZATION_MODEL_PATH` exists, the app does not fetch f
 | `LLM_MODEL_NAME` | default | Model name for summarization |
 | `LLM_MAX_TOKENS` | 8192 | Max output tokens for final LLM processing |
 | `LLM_TIMEOUT` | 300 | LLM request timeout in seconds |
-| `DEFAULT_TRANSCRIPTION_ENGINE` | reazon_nemo_v2 | Default batch transcription engine (`reazon_nemo_v2`, `parakeet_ja`, `faster_whisper`) |
+| `DEFAULT_TRANSCRIPTION_ENGINE` | reazon_nemo_v2 | Default batch transcription engine (`reazon_nemo_v2`, `cohere_transcribe`, `parakeet_ja`, `faster_whisper`) |
 | `AUDIO_PREPROCESSING_MODE` | light | ASR input preprocessing: `off`, `light`, or `denoise` |
 | `WHISPER_MODEL_SIZE` | medium | faster-whisper fallback / checker model size |
 | `WEB_WHISPER_DEVICE` | cpu | Device used by `web` in Docker |
@@ -372,7 +372,7 @@ python scripts/download_validation_models.py --only qwen_asr
 ```
 
 `CohereLabs/cohere-transcribe-03-2026` のような gated model を取得する場合は、
-Hugging Face 上でアクセス承認後に `HF_TOKEN` を設定してください。
+Hugging Face 上でアクセス承認後に `HF_TOKEN` または `HUGGINGFACE_TOKEN` を設定してください。
 
 長尺音声の比較検証は `scripts/benchmark_asr.py` を使います。
 

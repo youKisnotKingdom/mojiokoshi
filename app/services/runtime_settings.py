@@ -235,6 +235,7 @@ EDITABLE_SETTINGS: tuple[RuntimeSettingDefinition, ...] = (
         "str",
         choices=(
             ("reazon_nemo_v2", "reazon_nemo_v2"),
+            ("cohere_transcribe", "cohere_transcribe"),
             ("parakeet_ja", "parakeet_ja"),
             ("faster_whisper", "faster_whisper"),
             ("whisper", "whisper"),
