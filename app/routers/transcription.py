@@ -28,7 +28,7 @@ from app.models import (
 )
 from app.models.user import User
 from app.schemas.transcription import TranscriptionJobResponse
-from app.services import storage, summarization, transcript_output
+from app.services import storage, summarization, transcription, transcript_output
 from app.services.speaker_diarization import build_speaker_blocks
 from app.services.transcription_access import (
     can_manage_transcription_job,
@@ -461,9 +461,10 @@ async def upload_file(
     except ValueError:
         transcription_engine = TranscriptionEngine.PARAKEET_JA
 
-    effective_model_size = settings.whisper_model_size
-    if transcription_engine == TranscriptionEngine.PARAKEET_JA:
-        effective_model_size = "parakeet-tdt_ctc-0.6b-ja"
+    effective_model_size = transcription.model_size_for_engine(
+        transcription_engine,
+        settings.whisper_model_size,
+    )
     effective_language = language if language else None
 
     job = TranscriptionJob(

@@ -19,7 +19,7 @@ from app.models import AudioFile, AudioSource, RecordingChunk, RecordingSession,
 from app.models import TranscriptionEngine, TranscriptionJob
 from app.models.user import User
 from app.schemas.recording import WSChunkReceived, WSError, WSTranscriptionResult
-from app.services import storage
+from app.services import storage, transcription
 from app.time_utils import utc_now
 
 settings = get_settings()
@@ -325,14 +325,14 @@ async def finalize_recording(
     session.total_duration_seconds = total_duration
 
     # Create transcription job
+    engine = TranscriptionEngine(settings.default_transcription_engine)
     job = TranscriptionJob(
         audio_file_id=audio_file.id,
         user_id=user.id,
-        engine=TranscriptionEngine(settings.default_transcription_engine),
-        model_size=(
-            "parakeet-tdt_ctc-0.6b-ja"
-            if settings.default_transcription_engine == TranscriptionEngine.PARAKEET_JA.value
-            else settings.whisper_model_size
+        engine=engine,
+        model_size=transcription.model_size_for_engine(
+            engine,
+            settings.whisper_model_size,
         ),
     )
     db.add(job)

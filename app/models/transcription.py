@@ -31,6 +31,7 @@ class TranscriptionEngine(str, enum.Enum):
     FASTER_WHISPER = "faster_whisper"
     QWEN_ASR = "qwen_asr"
     PARAKEET_JA = "parakeet_ja"
+    REAZON_NEMO_V2 = "reazon_nemo_v2"
 
 
 class ChunkRefinementStatus(str, enum.Enum):

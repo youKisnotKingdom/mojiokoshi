@@ -2,6 +2,7 @@
 import asyncio
 from datetime import timedelta
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -27,8 +28,10 @@ logger = logging.getLogger(__name__)
 # Lazy-loaded model cache
 _whisper_models: dict[str, object] = {}
 _parakeet_models: dict[str, object] = {}
+_reazon_nemo_models: dict[str, object] = {}
 
 PARAKEET_JA_REPO_ID = "nvidia/parakeet-tdt_ctc-0.6b-ja"
+REAZON_NEMO_V2_REPO_ID = "reazon-research/reazonspeech-nemo-v2"
 FASTER_WHISPER_PREPROCESS_SAMPLE_RATE = 16000
 AUDIO_PREPROCESSING_FILTERS: dict[str, list[str]] = {
     "off": [],
@@ -104,6 +107,92 @@ def get_parakeet_model(device: str = "auto"):
         logger.info("Loaded Parakeet JA model on %s", runtime_device)
 
     return _parakeet_models[cache_key]
+
+
+def resolve_cached_model_source(repo_id: str) -> str:
+    if "/" not in repo_id:
+        return repo_id
+
+    cache_roots: list[Path] = []
+    for env_name in ("HF_HOME", "TRANSFORMERS_CACHE"):
+        env_value = os.environ.get(env_name)
+        if not env_value:
+            continue
+        env_path = Path(env_value).expanduser()
+        cache_roots.extend([env_path, env_path / "hub"])
+
+    default_cache_root = Path.home() / ".cache" / "huggingface"
+    cache_roots.extend([default_cache_root, default_cache_root / "hub"])
+
+    repo_cache_dir_name = f"models--{repo_id.replace('/', '--')}"
+    seen: set[Path] = set()
+    for root in cache_roots:
+        if root in seen:
+            continue
+        seen.add(root)
+        snapshots_dir = root / repo_cache_dir_name / "snapshots"
+        if not snapshots_dir.exists():
+            continue
+
+        snapshots = sorted(
+            (path for path in snapshots_dir.iterdir() if path.is_dir()),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        for snapshot in snapshots:
+            if list(snapshot.glob("*.nemo")):
+                return str(snapshot)
+            if any(
+                (snapshot / marker).exists()
+                for marker in (
+                    "config.json",
+                    "tokenizer_config.json",
+                    "processor_config.json",
+                    "preprocessor_config.json",
+                    "model.safetensors",
+                )
+            ):
+                return str(snapshot)
+
+    return repo_id
+
+
+def get_reazon_nemo_model(device: str = "auto"):
+    """Get or create a cached ReazonSpeech NeMo v2 model instance."""
+    runtime_device = resolve_runtime_device(device)
+    cache_key = f"{REAZON_NEMO_V2_REPO_ID}_{runtime_device}"
+    if cache_key not in _reazon_nemo_models:
+        try:
+            from nemo.collections.asr.models import EncDecRNNTBPEModel
+        except ImportError:
+            logger.error("nemo_toolkit[asr] not installed. Reazon NeMo v2 cannot be loaded.")
+            raise
+
+        model_source = Path(resolve_cached_model_source(REAZON_NEMO_V2_REPO_ID))
+        checkpoint_path = model_source
+        if model_source.is_dir():
+            nemo_files = sorted(model_source.glob("*.nemo"))
+            if not nemo_files:
+                raise FileNotFoundError(f"Reazon NeMo v2 checkpoint not found: {model_source}")
+            checkpoint_path = nemo_files[0]
+
+        map_location = "cuda" if runtime_device.startswith("cuda") else "cpu"
+        model = EncDecRNNTBPEModel.restore_from(str(checkpoint_path), map_location=map_location)
+        if runtime_device.startswith("cuda"):
+            model = model.cuda()
+        model.eval()
+        _reazon_nemo_models[cache_key] = model
+        logger.info("Loaded Reazon NeMo v2 model on %s", runtime_device)
+
+    return _reazon_nemo_models[cache_key]
+
+
+def model_size_for_engine(engine: TranscriptionEngine, fallback_model_size: str) -> str:
+    if engine == TranscriptionEngine.PARAKEET_JA:
+        return "parakeet-tdt_ctc-0.6b-ja"
+    if engine == TranscriptionEngine.REAZON_NEMO_V2:
+        return "reazonspeech-nemo-v2"
+    return fallback_model_size
 
 
 def _run_media_command(command: list[str]) -> None:
@@ -391,6 +480,46 @@ def transcribe_audio_parakeet_sync(
             chunk_offset += chunk_duration
 
 
+def transcribe_audio_reazon_nemo_sync(
+    audio_path: str,
+    language: str | None = None,
+    device: str = "auto",
+) -> Generator[dict, None, None]:
+    """Transcribe audio file using ReazonSpeech NeMo v2."""
+    runtime_device = resolve_runtime_device(device)
+    model = get_reazon_nemo_model(runtime_device)
+    source_path = Path(audio_path)
+    with tempfile.TemporaryDirectory(prefix="reazon-nemo-job-") as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        normalized_path = temp_dir / "normalized.wav"
+        chunks_dir = temp_dir / "chunks"
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+
+        _prepare_audio_for_asr(source_path, normalized_path, 16000)
+        chunks = _split_audio_for_parakeet(normalized_path, chunks_dir)
+
+        chunk_offset = 0.0
+        for chunk_index, chunk_path in enumerate(chunks):
+            result = model.transcribe([str(chunk_path)], batch_size=1)
+            item = result[0]
+            text = getattr(item, "text", str(item)).strip()
+            chunk_duration = _ffprobe_duration(chunk_path)
+            chunk_start = chunk_offset
+            chunk_end = chunk_offset + chunk_duration
+            if text:
+                yield {
+                    "text": text,
+                    "start": chunk_start,
+                    "end": chunk_end,
+                    "chunk_index": chunk_index,
+                    "chunk_start": chunk_start,
+                    "chunk_end": chunk_end,
+                    "words": [],
+                    "language": language,
+                }
+            chunk_offset += chunk_duration
+
+
 def transcribe_batch_job_sync(
     engine: TranscriptionEngine,
     audio_path: str,
@@ -402,13 +531,17 @@ def transcribe_batch_job_sync(
         yield from transcribe_audio_parakeet_sync(audio_path, language=language, device=device)
         return
 
+    if engine == TranscriptionEngine.REAZON_NEMO_V2:
+        yield from transcribe_audio_reazon_nemo_sync(audio_path, language=language, device=device)
+        return
+
     if engine in (TranscriptionEngine.FASTER_WHISPER, TranscriptionEngine.WHISPER):
         yield from transcribe_audio_sync(audio_path, model_size=model_size, language=language, device=device)
         return
 
     raise ValueError(
         f"Engine `{engine.value}` is not supported by the production worker. "
-        "Use Parakeet JA or Faster Whisper."
+        "Use Parakeet JA, Reazon NeMo v2, or Faster Whisper."
     )
 
 

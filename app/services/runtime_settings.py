@@ -238,6 +238,7 @@ EDITABLE_SETTINGS: tuple[RuntimeSettingDefinition, ...] = (
             ("faster_whisper", "faster_whisper"),
             ("whisper", "whisper"),
             ("qwen_asr", "qwen_asr"),
+            ("reazon_nemo_v2", "reazon_nemo_v2"),
         ),
         required=True,
     ),

@@ -7,7 +7,7 @@ Audio transcription and summarization web application for on-premises deployment
 - File upload transcription as the primary production path
 - Optional browser recording with real-time transcription (feature flag)
 - File upload support (MP3, WAV, M4A, FLAC, OGG, WebM, etc.)
-- Batch transcription using Parakeet JA by default with faster-whisper fallback
+- Batch transcription using Parakeet JA by default, with ReazonSpeech NeMo v2 and faster-whisper alternatives
 - LLM-powered summarization via local OpenAI-compatible API
 - Multi-user support with admin/user roles
 - Automatic audio file cleanup
@@ -18,7 +18,7 @@ Audio transcription and summarization web application for on-premises deployment
 - **Frontend**: HTMX + Jinja2 + Tailwind CSS
 - **Database**: PostgreSQL
 - **Background Worker**: In-process polling worker
-- **Transcription**: Parakeet JA (NeMo) / faster-whisper fallback
+- **Transcription**: Parakeet JA (NeMo) / ReazonSpeech NeMo v2 / faster-whisper fallback
 - **Summarization**: Local LLM server (vLLM, Ollama, etc.)
 
 ## Development Setup
@@ -165,7 +165,7 @@ With HTTPS overlay (`docker-compose.https.yml`):
 - Checker demo: https://\<server-ip\>:8444 (HTTPS required for microphone access)
 
 Production defaults:
-- Batch transcription runs on the `worker` container with `Parakeet JA`
+- Batch transcription runs on the `worker` container with `Parakeet JA` by default
 - `web` stays on CPU by default so batch and UI do not compete for GPU
 - Real-time recording UI is disabled by default with `ENABLE_REALTIME_TRANSCRIPTION=false`
 - The checker demo is optional and should stay on CPU unless you are explicitly testing it
@@ -280,7 +280,7 @@ At runtime, if `SPEAKER_DIARIZATION_MODEL_PATH` exists, the app does not fetch f
 | `LLM_MODEL_NAME` | default | Model name for summarization |
 | `LLM_MAX_TOKENS` | 8192 | Max output tokens for final LLM processing |
 | `LLM_TIMEOUT` | 300 | LLM request timeout in seconds |
-| `DEFAULT_TRANSCRIPTION_ENGINE` | parakeet_ja | Default batch transcription engine |
+| `DEFAULT_TRANSCRIPTION_ENGINE` | parakeet_ja | Default batch transcription engine (`parakeet_ja`, `reazon_nemo_v2`, `faster_whisper`) |
 | `AUDIO_PREPROCESSING_MODE` | light | ASR input preprocessing: `off`, `light`, or `denoise` |
 | `WHISPER_MODEL_SIZE` | medium | faster-whisper fallback / checker model size |
 | `WEB_WHISPER_DEVICE` | cpu | Device used by `web` in Docker |

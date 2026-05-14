@@ -1,6 +1,7 @@
 """Tests for ASR audio preprocessing."""
 from types import SimpleNamespace
 
+from app.models import TranscriptionEngine
 from app.services import transcription
 
 
@@ -98,3 +99,79 @@ def test_faster_whisper_keeps_source_audio_when_preprocessing_is_off(tmp_path, m
 
     assert commands == []
     assert transcribed_paths == [str(source)]
+
+
+def test_reazon_nemo_transcription_preprocesses_and_chunks(tmp_path, monkeypatch):
+    prepared_paths = []
+    chunk_a = tmp_path / "chunk_0000.wav"
+    chunk_b = tmp_path / "chunk_0001.wav"
+    chunk_a.write_bytes(b"a")
+    chunk_b.write_bytes(b"b")
+
+    def fake_prepare(source, output_path, sample_rate):
+        prepared_paths.append((source, output_path, sample_rate))
+        output_path.write_bytes(b"prepared")
+        return output_path
+
+    class FakeReazonModel:
+        def transcribe(self, paths, batch_size=1):
+            assert batch_size == 1
+            path = paths[0]
+            if path.endswith("chunk_0000.wav"):
+                return [SimpleNamespace(text="最初のチャンク")]
+            return [SimpleNamespace(text="次のチャンク")]
+
+    monkeypatch.setattr(transcription.settings, "audio_preprocessing_mode", "light")
+    monkeypatch.setattr(transcription, "_prepare_audio_for_asr", fake_prepare)
+    monkeypatch.setattr(transcription, "_split_audio_for_parakeet", lambda *_: [chunk_a, chunk_b])
+    monkeypatch.setattr(transcription, "_ffprobe_duration", lambda path: 5.0)
+    monkeypatch.setattr(transcription, "get_reazon_nemo_model", lambda device: FakeReazonModel())
+
+    source = tmp_path / "input.mp4"
+    source.write_bytes(b"fake")
+    segments = list(transcription.transcribe_audio_reazon_nemo_sync(str(source), language="ja", device="cpu"))
+
+    assert prepared_paths[0][0] == source
+    assert prepared_paths[0][2] == 16000
+    assert segments == [
+        {
+            "text": "最初のチャンク",
+            "start": 0.0,
+            "end": 5.0,
+            "chunk_index": 0,
+            "chunk_start": 0.0,
+            "chunk_end": 5.0,
+            "words": [],
+            "language": "ja",
+        },
+        {
+            "text": "次のチャンク",
+            "start": 5.0,
+            "end": 10.0,
+            "chunk_index": 1,
+            "chunk_start": 5.0,
+            "chunk_end": 10.0,
+            "words": [],
+            "language": "ja",
+        },
+    ]
+
+
+def test_batch_dispatch_supports_reazon_nemo(monkeypatch):
+    monkeypatch.setattr(
+        transcription,
+        "transcribe_audio_reazon_nemo_sync",
+        lambda *args, **kwargs: iter([{"text": "reazon"}]),
+    )
+
+    segments = list(
+        transcription.transcribe_batch_job_sync(
+            TranscriptionEngine.REAZON_NEMO_V2,
+            "input.wav",
+            "reazonspeech-nemo-v2",
+            "ja",
+            "cpu",
+        )
+    )
+
+    assert segments == [{"text": "reazon"}]
