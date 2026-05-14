@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     whisper_model_size: str = "medium"
     whisper_device: str = "cpu"
     whisper_language: str = "ja"
-    default_transcription_engine: str = "parakeet_ja"
+    default_transcription_engine: str = "reazon_nemo_v2"
     parakeet_chunk_seconds: int = 300
     parakeet_sample_rate: int = 16000
     audio_preprocessing_mode: str = "light"

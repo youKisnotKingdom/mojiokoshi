@@ -74,7 +74,7 @@ class TestFileUpload:
         assert "無効なファイル形式" in response.text
         assert "音声または動画ファイル" in response.text
 
-    def test_default_upload_uses_parakeet_and_japanese(self, user_client, db):
+    def test_default_upload_uses_reazon_nemo_and_japanese(self, user_client, db):
         csrf = get_csrf_token(user_client)
         response = user_client.post(
             "/transcription/upload",
@@ -84,8 +84,8 @@ class TestFileUpload:
 
         assert response.status_code == 200, response.text
         job = db.execute(select(TranscriptionJob)).scalar_one()
-        assert job.engine == TranscriptionEngine.PARAKEET_JA
-        assert job.model_size == "parakeet-tdt_ctc-0.6b-ja"
+        assert job.engine == TranscriptionEngine.REAZON_NEMO_V2
+        assert job.model_size == "reazonspeech-nemo-v2"
         assert job.language == "ja"
 
     def test_missing_csrf_rejected(self, user_client):
@@ -131,16 +131,16 @@ class TestFileUpload:
 
         assert response.status_code == 200, response.text
         job = db.execute(select(TranscriptionJob)).scalar_one()
-        assert job.engine == TranscriptionEngine.PARAKEET_JA
-        assert job.model_size == "parakeet-tdt_ctc-0.6b-ja"
+        assert job.engine == TranscriptionEngine.REAZON_NEMO_V2
+        assert job.model_size == "reazonspeech-nemo-v2"
 
-    def test_upload_uses_reazon_nemo_when_admin_default_is_reazon(self, user_client, db, monkeypatch):
+    def test_upload_uses_parakeet_when_admin_default_is_parakeet(self, user_client, db, monkeypatch):
         from app.routers import transcription as transcription_router
 
         monkeypatch.setattr(
             transcription_router.settings,
             "default_transcription_engine",
-            "reazon_nemo_v2",
+            "parakeet_ja",
         )
 
         csrf = get_csrf_token(user_client)
@@ -152,8 +152,8 @@ class TestFileUpload:
 
         assert response.status_code == 200, response.text
         job = db.execute(select(TranscriptionJob)).scalar_one()
-        assert job.engine == TranscriptionEngine.REAZON_NEMO_V2
-        assert job.model_size == "reazonspeech-nemo-v2"
+        assert job.engine == TranscriptionEngine.PARAKEET_JA
+        assert job.model_size == "parakeet-tdt_ctc-0.6b-ja"
 
 
 class TestDeleteJob:
