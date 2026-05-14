@@ -333,6 +333,7 @@ def test_job_detail_shows_transcription_chunks_with_time_badges(user_client, db,
     assert "00:00:10 - 00:00:20" in response.text
     assert "Chunk 01" not in response.text
     assert "文字起こしチャンク1" in response.text
+    assert "[00:00:00 - 00:00:10] 文字起こしチャンク1" in response.text
     assert "[00:00:00-00:00:10]" not in response.text
 
 
@@ -631,6 +632,44 @@ def test_download_transcription_result_formats(user_client, db, regular_user):
     assert "SPEAKER_00: こんにちは" in vtt_response.text
     assert json_response.status_code == 200
     assert '"speaker_blocks"' in json_response.text
+
+
+def test_download_transcription_txt_includes_chunk_timecodes(user_client, db, regular_user):
+    job = _completed_job(db, regular_user.id)
+    db.add_all(
+        [
+            TranscriptionChunk(
+                transcription_job_id=job.id,
+                user_id=regular_user.id,
+                chunk_index=0,
+                start_seconds=0.0,
+                end_seconds=10.0,
+                raw_text="文字起こしチャンク1",
+                refinement_status=ChunkRefinementStatus.COMPLETED,
+            ),
+            TranscriptionChunk(
+                transcription_job_id=job.id,
+                user_id=regular_user.id,
+                chunk_index=1,
+                start_seconds=10.0,
+                end_seconds=20.0,
+                raw_text="文字起こしチャンク2",
+                refinement_status=ChunkRefinementStatus.COMPLETED,
+            ),
+        ]
+    )
+    db.commit()
+
+    txt_response = user_client.get(f"/transcription/job/{job.id}/download/txt")
+    json_response = user_client.get(f"/transcription/job/{job.id}/download/json")
+
+    assert txt_response.status_code == 200
+    assert "[00:00:00 - 00:00:10] 文字起こしチャンク1" in txt_response.text
+    assert "[00:00:10 - 00:00:20] 文字起こしチャンク2" in txt_response.text
+    assert json_response.status_code == 200
+    assert '"transcription_chunks"' in json_response.text
+    assert '"start": 0.0' in json_response.text
+    assert '"end": 10.0' in json_response.text
 
 
 def test_stream_job_audio_returns_retained_source_file(user_client, db, regular_user, tmp_path):

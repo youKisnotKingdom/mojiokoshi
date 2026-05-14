@@ -224,7 +224,15 @@ def _progressive_refined_chunks(job: TranscriptionJob) -> list[dict[str, object]
 
 
 def _progressive_refined_text(chunks: list[dict[str, object]]) -> str:
-    return "\n\n".join(str(chunk["text"]).strip() for chunk in chunks if str(chunk["text"]).strip())
+    lines: list[str] = []
+    for chunk in chunks:
+        text = str(chunk["text"]).strip()
+        if not text:
+            continue
+        start = transcript_output.format_timecode(chunk.get("start_seconds", 0.0))
+        end = transcript_output.format_timecode(chunk.get("end_seconds", 0.0))
+        lines.append(f"[{start} - {end}] {text}")
+    return "\n\n".join(lines)
 
 
 def _summary_uses_chunk_refinement(summary: Summary) -> bool:
@@ -580,6 +588,10 @@ async def job_detail_page(
             "history_url": history_url,
             "speaker_blocks": speaker_blocks,
             "speaker_text": transcript_output.build_speaker_text(job),
+            "transcript_text_with_timecodes": transcript_output.build_chunked_transcript_text(
+                job,
+                fallback_to_result=False,
+            ),
             "audio_available": audio_available,
             "audio_is_video": audio_is_video,
             "show_next_actions": settings.show_next_actions,
@@ -666,7 +678,7 @@ async def download_job_result(
 
     stem = transcript_output.safe_download_stem(job)
     if export_format == "txt":
-        content = job.result_text or ""
+        content = transcript_output.build_chunked_transcript_text(job)
         media_type = "text/plain; charset=utf-8"
         filename = f"{stem}.txt"
     elif export_format == "speaker-txt":

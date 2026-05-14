@@ -32,6 +32,12 @@ def _iso(value: object) -> str | None:
     return str(value)
 
 
+def _enum_value(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(getattr(value, "value", value))
+
+
 def safe_download_stem(job: TranscriptionJob, prefix: str = "transcription") -> str:
     """Return an ASCII-safe filename stem for attachment downloads."""
     source_name = job.audio_file.original_filename if job.audio_file else prefix
@@ -102,6 +108,22 @@ def build_refined_transcript_text(job: TranscriptionJob, *, include_timecodes: b
     return "\n\n".join(chunk_lines)
 
 
+def build_chunked_transcript_text(job: TranscriptionJob, *, fallback_to_result: bool = True) -> str:
+    """Return raw transcript text with chunk-level timecodes when chunks exist."""
+    chunk_lines: list[str] = []
+    for chunk in _chunks(job):
+        text = (getattr(chunk, "raw_text", "") or "").strip()
+        if not text:
+            continue
+        start = format_timecode(getattr(chunk, "start_seconds", 0.0))
+        end = format_timecode(getattr(chunk, "end_seconds", 0.0))
+        chunk_lines.append(f"[{start} - {end}] {text}")
+
+    if chunk_lines:
+        return "\n\n".join(chunk_lines)
+    return (job.result_text or "") if fallback_to_result else ""
+
+
 def build_summary_prompt_context(job: TranscriptionJob) -> dict[str, object]:
     audio_file = job.audio_file
     duration_seconds = audio_file.duration_seconds if audio_file else None
@@ -127,6 +149,17 @@ def build_webvtt(job: TranscriptionJob) -> str:
     """Build a WebVTT subtitle file from timestamped transcription segments."""
     cues: list[str] = ["WEBVTT", ""]
     segments = _segments(job)
+
+    if not segments:
+        segments = [
+            {
+                "start": getattr(chunk, "start_seconds", 0.0),
+                "end": getattr(chunk, "end_seconds", 0.0),
+                "text": getattr(chunk, "raw_text", ""),
+            }
+            for chunk in _chunks(job)
+            if (getattr(chunk, "raw_text", "") or "").strip()
+        ]
 
     if not segments and job.result_text:
         segments = [{"start": 0.0, "end": 1.0, "text": job.result_text}]
@@ -164,6 +197,7 @@ def build_webvtt(job: TranscriptionJob) -> str:
 
 def build_result_json(job: TranscriptionJob) -> str:
     audio_file = job.audio_file
+    chunks = _chunks(job)
     payload = {
         "id": str(job.id),
         "status": job.status.value,
@@ -179,6 +213,18 @@ def build_result_json(job: TranscriptionJob) -> str:
         "audio_file": None,
         "result_text": job.result_text,
         "result_segments": _segments(job),
+        "transcription_chunks": [
+            {
+                "chunk_index": getattr(chunk, "chunk_index", 0),
+                "start": getattr(chunk, "start_seconds", 0.0),
+                "end": getattr(chunk, "end_seconds", 0.0),
+                "raw_text": getattr(chunk, "raw_text", ""),
+                "refined_text": getattr(chunk, "refined_text", None),
+                "refinement_status": _enum_value(getattr(chunk, "refinement_status", None)),
+                "raw_segments": getattr(chunk, "raw_segments", None),
+            }
+            for chunk in chunks
+        ],
         "speaker_blocks": build_speaker_blocks(_segments(job)),
     }
     if audio_file:

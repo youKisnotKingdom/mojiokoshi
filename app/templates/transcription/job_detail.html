@@ -200,7 +200,7 @@
                                 文字起こし全文を表示
                                 <span class="ml-2 text-xs font-normal text-gray-500">{{ job.result_text|length }}文字</span>
                             </summary>
-                            <pre id="result-text" class="hidden">{{ job.result_text }}</pre>
+                            <pre id="result-text" class="hidden">{% if transcript_text_with_timecodes %}{{ transcript_text_with_timecodes }}{% else %}{{ job.result_text }}{% endif %}</pre>
                             {% if job.chunks %}
                             <div class="mt-4 space-y-3">
                                 {% for chunk in job.chunks %}

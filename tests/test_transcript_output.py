@@ -88,3 +88,53 @@ def test_build_summary_prompt_context_exposes_refined_and_raw_text():
     assert context["refined_text"] == "本文整形後チャンク"
     assert context["raw_text"] == "こんにちは 続き どうですか"
     assert "SPEAKER_00" in str(context["speaker_text"])
+
+
+def test_build_chunked_transcript_text_uses_chunk_timecodes():
+    job = _job_with_segments()
+    job.chunks = [
+        TranscriptionChunk(
+            transcription_job_id=job.id,
+            user_id=job.user_id,
+            chunk_index=0,
+            start_seconds=0.0,
+            end_seconds=10.0,
+            raw_text="最初の本文",
+            refinement_status=ChunkRefinementStatus.COMPLETED,
+        ),
+        TranscriptionChunk(
+            transcription_job_id=job.id,
+            user_id=job.user_id,
+            chunk_index=1,
+            start_seconds=10.0,
+            end_seconds=20.0,
+            raw_text="次の本文",
+            refinement_status=ChunkRefinementStatus.COMPLETED,
+        ),
+    ]
+
+    text = transcript_output.build_chunked_transcript_text(job)
+
+    assert "[00:00:00 - 00:00:10] 最初の本文" in text
+    assert "[00:00:10 - 00:00:20] 次の本文" in text
+
+
+def test_build_webvtt_falls_back_to_chunks_when_segments_are_missing():
+    job = _job_with_segments()
+    job.result_segments = None
+    job.chunks = [
+        TranscriptionChunk(
+            transcription_job_id=job.id,
+            user_id=job.user_id,
+            chunk_index=0,
+            start_seconds=5.0,
+            end_seconds=15.0,
+            raw_text="チャンク字幕",
+            refinement_status=ChunkRefinementStatus.COMPLETED,
+        )
+    ]
+
+    vtt = transcript_output.build_webvtt(job)
+
+    assert "00:00:05.000 --> 00:00:15.000" in vtt
+    assert "チャンク字幕" in vtt
