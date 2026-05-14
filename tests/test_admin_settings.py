@@ -88,6 +88,27 @@ class TestAdminSettings:
             for key, value in original_values.items():
                 setattr(settings, key, value)
 
+    def test_admin_can_change_default_transcription_engine(self, admin_client, db):
+        settings = get_settings()
+        original_engine = settings.default_transcription_engine
+        try:
+            csrf = get_csrf_token(admin_client)
+            response = admin_client.post(
+                "/admin/settings",
+                data=build_settings_form(
+                    csrf,
+                    {"default_transcription_engine": "parakeet_ja"},
+                ),
+                follow_redirects=False,
+            )
+
+            assert response.status_code == 303
+            assert response.headers["location"] == "/admin/settings?saved=1"
+            assert db.get(AppSetting, "default_transcription_engine").value == "parakeet_ja"
+            assert get_settings().default_transcription_engine == "parakeet_ja"
+        finally:
+            settings.default_transcription_engine = original_engine
+
     def test_invalid_runtime_setting_is_rejected(self, admin_client):
         settings = get_settings()
         original_max_tokens = settings.llm_max_tokens
