@@ -91,11 +91,31 @@ def _generate_unused_user_id(db: Session) -> str:
             return user_id
 
 
+def _user_id_for_new_ldap_user(db: Session, external_id: str) -> str:
+    if external_id.isdigit() and len(external_id) == 6 and not get_user_by_user_id(db, external_id):
+        return external_id
+    return _generate_unused_user_id(db)
+
+
 def _ldap_default_role() -> UserRole:
     try:
         return UserRole(settings.ldap_default_role)
     except ValueError:
         return UserRole.USER
+
+
+def _ldap_bootstrap_admin_ids() -> set[str]:
+    return {
+        user_id.strip()
+        for user_id in settings.ldap_bootstrap_admin_user_ids.split(",")
+        if user_id.strip()
+    }
+
+
+def _role_for_new_ldap_user(external_id: str) -> UserRole:
+    if external_id in _ldap_bootstrap_admin_ids():
+        return UserRole.ADMIN
+    return _ldap_default_role()
 
 
 def _get_or_create_ldap_user(
@@ -114,12 +134,12 @@ def _get_or_create_ldap_user(
         return user
 
     user = User(
-        user_id=_generate_unused_user_id(db),
+        user_id=_user_id_for_new_ldap_user(db, ldap_user.external_id),
         external_auth_provider="ldap",
         external_auth_id=ldap_user.external_id,
         password_hash=_new_unlinked_password_hash(),
         display_name=ldap_user.display_name or ldap_user.external_id,
-        role=_ldap_default_role(),
+        role=_role_for_new_ldap_user(ldap_user.external_id),
         is_active=True,
         last_login_at=utc_now(),
     )
@@ -150,7 +170,11 @@ def authenticate_user(db: Session, user_id: str, password: str) -> User | None:
     if user:
         if user.external_auth_provider == "ldap":
             return _authenticate_linked_ldap_user(db, user, password)
-        if user.is_active and verify_password(password, user.password_hash):
+        if (
+            settings.local_password_login_enabled
+            and user.is_active
+            and verify_password(password, user.password_hash)
+        ):
             user.last_login_at = utc_now()
             db.commit()
             return user

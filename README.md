@@ -182,9 +182,10 @@ This app does not run an LDAP server. Point `LDAP_SERVER_URI` at an existing
 OpenLDAP server on the internal network.
 
 Local 6-digit users remain available. When OpenLDAP is enabled, users can log in
-with their LDAP ID; the app creates a linked local user on first successful login
+with their 6-digit LDAP ID; the app creates a linked local user on first successful login
 so existing ownership, history, and permissions continue to use the internal user
-table.
+table. If the LDAP ID is a 6-digit number and it is not already used locally, the
+app keeps that value as the local app user ID.
 
 ```env
 LDAP_ENABLED=true
@@ -197,6 +198,8 @@ LDAP_USER_ID_ATTRIBUTE=uid
 LDAP_DISPLAY_NAME_ATTRIBUTE=cn
 LDAP_START_TLS=false
 LDAP_DEFAULT_ROLE=user
+LDAP_BOOTSTRAP_ADMIN_USER_IDS=000001
+LOCAL_PASSWORD_LOGIN_ENABLED=false
 ```
 
 Optional admin group mapping:
@@ -208,8 +211,9 @@ LDAP_ADMIN_GROUP_DN=cn=mojiokoshi-admins,ou=groups,dc=example,dc=local
 ```
 
 If LDAP is disabled, the login screen only accepts the existing 6-digit user ID.
-If LDAP is enabled, the same field accepts either a local 6-digit user ID or an
-LDAP ID.
+For LDAP-first operation, use a 6-digit LDAP `uid` for each app user. Set
+`LDAP_BOOTSTRAP_ADMIN_USER_IDS` for the first app admin, then manage later app
+roles from the admin UI.
 
 ### Offline Speaker Diarization Model
 

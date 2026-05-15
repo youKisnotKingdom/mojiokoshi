@@ -550,6 +550,22 @@ EDITABLE_SETTINGS: tuple[RuntimeSettingDefinition, ...] = (
         required=True,
     ),
     RuntimeSettingDefinition(
+        "ldap_bootstrap_admin_user_ids",
+        "LDAP_BOOTSTRAP_ADMIN_USER_IDS",
+        "初期LDAP管理者ID",
+        "ldap",
+        "str",
+        "サラのDBで最初から管理者にするLDAP IDをカンマ区切りで指定します。通常の権限管理はアプリ側で行います。",
+    ),
+    RuntimeSettingDefinition(
+        "local_password_login_enabled",
+        "LOCAL_PASSWORD_LOGIN_ENABLED",
+        "ローカルパスワードログイン",
+        "ldap",
+        "bool",
+        "off にすると、LDAP連携済みでないローカルユーザーのパスワードログインを無効化します。",
+    ),
+    RuntimeSettingDefinition(
         "ldap_group_base_dn",
         "LDAP_GROUP_BASE_DN",
         "LDAP group base DN",

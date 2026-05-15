@@ -132,6 +132,68 @@ class TestLogin:
         assert user.user_id.isdigit()
         assert len(user.user_id) == 6
 
+    def test_ldap_login_uses_six_digit_external_id_as_app_user_id(self, client, db, monkeypatch):
+        from app.models.user import UserRole
+        from app.services import auth as auth_service
+        from app.services.ldap_auth import LDAPAuthenticatedUser
+
+        monkeypatch.setattr(auth_service.settings, "ldap_enabled", True)
+        monkeypatch.setattr(auth_service.settings, "ldap_bootstrap_admin_user_ids", "")
+        monkeypatch.setattr(
+            auth_service.ldap_auth,
+            "authenticate_ldap_user",
+            lambda user_id, password: LDAPAuthenticatedUser(
+                external_id="123456",
+                display_name="LDAP User",
+                is_admin=False,
+            )
+            if user_id == "123456" and password == "ldap-pass"
+            else None,
+        )
+
+        csrf = get_csrf_token(client)
+        response = client.post(
+            "/auth/login",
+            data={"user_id": "123456", "password": "ldap-pass", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        user = auth_service.get_user_by_external_auth(db, "ldap", "123456")
+        assert user is not None
+        assert user.user_id == "123456"
+        assert user.role == UserRole.USER
+
+    def test_ldap_bootstrap_admin_ids_grant_initial_app_admin_role(self, client, db, monkeypatch):
+        from app.models.user import UserRole
+        from app.services import auth as auth_service
+        from app.services.ldap_auth import LDAPAuthenticatedUser
+
+        monkeypatch.setattr(auth_service.settings, "ldap_enabled", True)
+        monkeypatch.setattr(auth_service.settings, "ldap_default_role", "user")
+        monkeypatch.setattr(auth_service.settings, "ldap_bootstrap_admin_user_ids", "123456,999999")
+        monkeypatch.setattr(
+            auth_service.ldap_auth,
+            "authenticate_ldap_user",
+            lambda user_id, password: LDAPAuthenticatedUser(
+                external_id="123456",
+                display_name="LDAP Admin",
+                is_admin=False,
+            ),
+        )
+
+        csrf = get_csrf_token(client)
+        response = client.post(
+            "/auth/login",
+            data={"user_id": "123456", "password": "ldap-pass", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        user = auth_service.get_user_by_external_auth(db, "ldap", "123456")
+        assert user is not None
+        assert user.role == UserRole.ADMIN
+
     def test_ldap_linked_user_can_login_with_app_user_id(self, client, db, monkeypatch):
         from app.models.user import User, UserRole
         from app.services import auth as auth_service
@@ -209,6 +271,21 @@ class TestLogin:
                 "password": "local-password-should-not-work",
                 "csrf_token": csrf,
             },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 401
+
+    def test_local_password_login_can_be_disabled(self, client, admin_user, monkeypatch):
+        from app.services import auth as auth_service
+
+        monkeypatch.setattr(auth_service.settings, "local_password_login_enabled", False)
+        monkeypatch.setattr(auth_service.ldap_auth, "authenticate_ldap_user", lambda *_: None)
+
+        csrf = get_csrf_token(client)
+        response = client.post(
+            "/auth/login",
+            data={"user_id": "000001", "password": "AdminPass1", "csrf_token": csrf},
             follow_redirects=False,
         )
 

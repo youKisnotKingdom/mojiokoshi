@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     ldap_start_tls: bool = False
     ldap_connect_timeout: int = 5
     ldap_default_role: str = "user"
+    ldap_bootstrap_admin_user_ids: str = ""
+    local_password_login_enabled: bool = True
     ldap_group_base_dn: str = ""
     ldap_group_filter: str = "(member={user_dn})"
     ldap_admin_group_dn: str = ""
