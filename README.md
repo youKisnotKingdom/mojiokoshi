@@ -281,6 +281,7 @@ At runtime, if `SPEAKER_DIARIZATION_MODEL_PATH` exists, the app does not fetch f
 | `LLM_MAX_TOKENS` | 8192 | Max output tokens for final LLM processing |
 | `LLM_TIMEOUT` | 300 | LLM request timeout in seconds |
 | `DEFAULT_TRANSCRIPTION_ENGINE` | reazon_nemo_v2 | Default batch transcription engine (`reazon_nemo_v2`, `cohere_transcribe`, `parakeet_ja`, `faster_whisper`) |
+| `COHERE_TRANSCRIBE_DEVICE` | cpu | Device for Cohere Transcribe (`cpu`, `cuda`, `auto`) |
 | `AUDIO_PREPROCESSING_MODE` | light | ASR input preprocessing: `off`, `light`, or `denoise` |
 | `WHISPER_MODEL_SIZE` | medium | faster-whisper fallback / checker model size |
 | `WEB_WHISPER_DEVICE` | cpu | Device used by `web` in Docker |

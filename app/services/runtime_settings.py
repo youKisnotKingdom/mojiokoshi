@@ -260,6 +260,20 @@ EDITABLE_SETTINGS: tuple[RuntimeSettingDefinition, ...] = (
         required=True,
     ),
     RuntimeSettingDefinition(
+        "cohere_transcribe_device",
+        "COHERE_TRANSCRIBE_DEVICE",
+        "Cohere Transcribe デバイス",
+        "transcription",
+        "str",
+        "GPU を他プロセスが使っている環境では cpu を推奨します。",
+        choices=(
+            ("cpu", "cpu"),
+            ("cuda", "cuda"),
+            ("auto", "auto"),
+        ),
+        required=True,
+    ),
+    RuntimeSettingDefinition(
         "whisper_language",
         "WHISPER_LANGUAGE",
         "文字起こし言語",

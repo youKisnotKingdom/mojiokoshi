@@ -76,6 +76,7 @@ benchmark_datasets/
 benchmarks/
 hf_cache_canary_http/
 hf_cache_user/
+local_model_cache/
 benchmark_logs/
 
 # Local ad hoc audio / benchmark outputs

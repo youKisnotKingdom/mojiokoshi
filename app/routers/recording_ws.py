@@ -355,7 +355,10 @@ async def transcribe_and_send(session_id: str, chunk_path: str, chunk_index: int
             chunk_path,
             model_size=settings.whisper_model_size,
             language=settings.whisper_language,
-            device=settings.whisper_device,
+            device=transcription.device_for_engine(
+                TranscriptionEngine(settings.default_transcription_engine),
+                settings.whisper_device,
+            ),
         )
         if text:
             # DBに保存

@@ -50,6 +50,7 @@ class TestAdminSettings:
         assert "AUDIO_PREPROCESSING_MODE" in response.text
         assert "reazon_nemo_v2" in response.text
         assert "cohere_transcribe" in response.text
+        assert "COHERE_TRANSCRIBE_DEVICE" in response.text
         assert "プロンプト" in response.text
 
     def test_regular_user_cannot_view_settings(self, user_client):

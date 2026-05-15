@@ -252,3 +252,23 @@ def test_batch_dispatch_supports_cohere_transcribe(monkeypatch):
     )
 
     assert segments == [{"text": "cohere"}]
+
+
+def test_device_for_engine_uses_cohere_specific_device(monkeypatch):
+    monkeypatch.setattr(transcription.settings, "whisper_device", "cuda")
+    monkeypatch.setattr(transcription.settings, "cohere_transcribe_device", "cpu")
+
+    assert (
+        transcription.device_for_engine(
+            TranscriptionEngine.COHERE_TRANSCRIBE,
+            transcription.settings.whisper_device,
+        )
+        == "cpu"
+    )
+    assert (
+        transcription.device_for_engine(
+            TranscriptionEngine.REAZON_NEMO_V2,
+            transcription.settings.whisper_device,
+        )
+        == "cuda"
+    )

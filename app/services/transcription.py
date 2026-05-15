@@ -241,6 +241,12 @@ def model_size_for_engine(engine: TranscriptionEngine, fallback_model_size: str)
     return fallback_model_size
 
 
+def device_for_engine(engine: TranscriptionEngine, fallback_device: str | None = None) -> str:
+    if engine == TranscriptionEngine.COHERE_TRANSCRIBE:
+        return settings.cohere_transcribe_device or fallback_device or settings.whisper_device
+    return fallback_device or settings.whisper_device
+
+
 def _run_media_command(command: list[str]) -> None:
     subprocess.run(command, check=True, capture_output=True, text=True)
 
@@ -764,9 +770,15 @@ async def process_transcription_job(
 
         model_size = job.model_size or settings.whisper_model_size
         language = job.language
-        device = settings.whisper_device
+        device = device_for_engine(job.engine, settings.whisper_device)
 
-        logger.info(f"Starting transcription job {job.id}: {audio_path}")
+        logger.info(
+            "Starting transcription job %s: %s (engine=%s, device=%s)",
+            job.id,
+            audio_path,
+            job.engine.value,
+            device,
+        )
 
         segments = []
         full_text = []
