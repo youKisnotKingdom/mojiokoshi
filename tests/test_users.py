@@ -105,6 +105,24 @@ class TestUpdateUser:
         assert response.status_code == 200
         assert "更新しました" in response.text
 
+    def test_admin_can_reset_local_user_password(self, admin_client, db, regular_user):
+        from app.services import auth as auth_service
+
+        csrf = get_csrf_token(admin_client, f"/admin/users/{regular_user.user_id}")
+        response = admin_client.post(
+            f"/admin/users/{regular_user.user_id}/reset-password",
+            data={
+                "new_password": "ResetPass123",
+                "csrf_token": csrf,
+            },
+        )
+
+        assert response.status_code == 200
+        assert "パスワードをリセットしました" in response.text
+        db.refresh(regular_user)
+        assert auth_service.verify_password("ResetPass123", regular_user.password_hash)
+        assert auth_service.authenticate_user(db, regular_user.user_id, "ResetPass123") == regular_user
+
     def test_ldap_user_edit_page_shows_ldap_identity_and_hides_password_reset(self, admin_client, db):
         user = create_ldap_user(db)
 
