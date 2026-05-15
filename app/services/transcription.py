@@ -101,7 +101,11 @@ def get_parakeet_model(device: str = "auto"):
             logger.error("nemo_toolkit[asr] not installed. Run: pip install nemo_toolkit[asr]")
             raise
 
-        model = nemo_asr.models.ASRModel.from_pretrained(model_name=PARAKEET_JA_REPO_ID)
+        map_location = "cuda" if runtime_device.startswith("cuda") else "cpu"
+        model = nemo_asr.models.ASRModel.from_pretrained(
+            model_name=PARAKEET_JA_REPO_ID,
+            map_location=map_location,
+        )
         if runtime_device.startswith("cuda"):
             model = model.cuda()
         model.eval()

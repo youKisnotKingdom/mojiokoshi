@@ -1,4 +1,6 @@
 """Tests for ASR audio preprocessing."""
+import sys
+import types
 from types import SimpleNamespace
 
 from app.models import TranscriptionEngine
@@ -175,6 +177,40 @@ def test_batch_dispatch_supports_reazon_nemo(monkeypatch):
     )
 
     assert segments == [{"text": "reazon"}]
+
+
+def test_parakeet_model_respects_requested_cpu_device(monkeypatch):
+    calls = {}
+
+    class FakeParakeetModel:
+        def eval(self):
+            calls["eval"] = True
+
+    class FakeASRModel:
+        @staticmethod
+        def from_pretrained(*, model_name, map_location):
+            calls["model_name"] = model_name
+            calls["map_location"] = map_location
+            return FakeParakeetModel()
+
+    fake_asr = types.ModuleType("nemo.collections.asr")
+    fake_asr.models = SimpleNamespace(ASRModel=FakeASRModel)
+    fake_collections = types.ModuleType("nemo.collections")
+    fake_collections.asr = fake_asr
+    fake_nemo = types.ModuleType("nemo")
+    fake_nemo.collections = fake_collections
+    monkeypatch.setitem(sys.modules, "nemo", fake_nemo)
+    monkeypatch.setitem(sys.modules, "nemo.collections", fake_collections)
+    monkeypatch.setitem(sys.modules, "nemo.collections.asr", fake_asr)
+    transcription._parakeet_models.clear()
+
+    transcription.get_parakeet_model("cpu")
+
+    assert calls == {
+        "model_name": transcription.PARAKEET_JA_REPO_ID,
+        "map_location": "cpu",
+        "eval": True,
+    }
 
 
 def test_cohere_transcribe_preprocesses_and_chunks(tmp_path, monkeypatch):
