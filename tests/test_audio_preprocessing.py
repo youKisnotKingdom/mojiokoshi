@@ -3,6 +3,8 @@ import sys
 import types
 from types import SimpleNamespace
 
+import numpy as np
+
 from app.models import TranscriptionEngine
 from app.services import transcription
 
@@ -77,6 +79,48 @@ def test_faster_whisper_uses_preprocessed_audio_when_enabled(tmp_path, monkeypat
     assert transcribed_paths
     assert transcribed_paths[0].endswith("preprocessed.wav")
     assert segments == [{"text": "テスト", "start": 0.0, "end": 1.0, "words": []}]
+
+
+def test_faster_whisper_converts_numpy_scalars_for_db_and_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(transcription.settings, "audio_preprocessing_mode", "off")
+
+    class FakeWhisperModel:
+        def transcribe(self, audio_path, **kwargs):
+            return (
+                [
+                    SimpleNamespace(
+                        text=" テスト ",
+                        start=np.float64(0.5),
+                        end=np.float64(1.25),
+                        words=[
+                            SimpleNamespace(
+                                word="テスト",
+                                start=np.float64(0.5),
+                                end=np.float64(1.25),
+                                probability=np.float64(0.9),
+                            )
+                        ],
+                    )
+                ],
+                SimpleNamespace(language="ja", language_probability=np.float64(1.0)),
+            )
+
+    monkeypatch.setattr(transcription, "get_whisper_model", lambda *args, **kwargs: FakeWhisperModel())
+
+    source = tmp_path / "input.wav"
+    source.write_bytes(b"fake")
+    segments = list(transcription.transcribe_audio_sync(str(source), language="ja", device="cpu"))
+
+    assert segments == [
+        {
+            "text": "テスト",
+            "start": 0.5,
+            "end": 1.25,
+            "words": [{"word": "テスト", "start": 0.5, "end": 1.25, "probability": 0.9}],
+        }
+    ]
+    assert type(segments[0]["end"]) is float
+    assert type(segments[0]["words"][0]["probability"]) is float
 
 
 def test_faster_whisper_keeps_source_audio_when_preprocessing_is_off(tmp_path, monkeypatch):

@@ -51,6 +51,13 @@ AUDIO_PREPROCESSING_FILTERS: dict[str, list[str]] = {
 }
 
 
+def _plain_float(value, default: float = 0.0) -> float:
+    """Convert NumPy/scalar-like values before handing them to DB/JSON layers."""
+    if value is None:
+        return default
+    return float(value)
+
+
 def get_whisper_model(model_size: str = "medium", device: str = "auto"):
     """
     Get or create a faster-whisper model instance.
@@ -408,10 +415,15 @@ def transcribe_audio_sync(
         for segment in segments:
             yield {
                 "text": segment.text.strip(),
-                "start": segment.start,
-                "end": segment.end,
+                "start": _plain_float(segment.start),
+                "end": _plain_float(segment.end),
                 "words": [
-                    {"word": w.word, "start": w.start, "end": w.end, "probability": w.probability}
+                    {
+                        "word": w.word,
+                        "start": _plain_float(w.start),
+                        "end": _plain_float(w.end),
+                        "probability": _plain_float(w.probability),
+                    }
                     for w in (segment.words or [])
                 ],
             }
@@ -850,7 +862,7 @@ async def process_transcription_job(
                 if segment_end is None:
                     progress = 99.0
                 else:
-                    progress = min(99.0, (segment_end / total_duration) * 100)
+                    progress = min(99.0, (_plain_float(segment_end) / total_duration) * 100)
                 job.progress_percent = progress
                 db.commit()
                 if progress_callback:
