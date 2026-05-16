@@ -308,3 +308,16 @@ def test_device_for_engine_uses_cohere_specific_device(monkeypatch):
         )
         == "cuda"
     )
+
+
+def test_device_for_engine_falls_back_for_cohere_when_device_is_blank(monkeypatch):
+    monkeypatch.setattr(transcription.settings, "whisper_device", "cuda")
+    monkeypatch.setattr(transcription.settings, "cohere_transcribe_device", "")
+
+    assert (
+        transcription.device_for_engine(
+            TranscriptionEngine.COHERE_TRANSCRIBE,
+            transcription.settings.whisper_device,
+        )
+        == "cuda"
+    )

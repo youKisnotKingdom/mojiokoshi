@@ -265,13 +265,13 @@ EDITABLE_SETTINGS: tuple[RuntimeSettingDefinition, ...] = (
         "Cohere Transcribe デバイス",
         "transcription",
         "str",
-        "GPU を他プロセスが使っている環境では cpu を推奨します。",
+        "空欄の場合は通常の文字起こしデバイスに合わせます。Cohere だけ切り替えたい場合に指定します。",
         choices=(
+            ("", "文字起こしデバイスに合わせる"),
             ("cpu", "cpu"),
             ("cuda", "cuda"),
             ("auto", "auto"),
         ),
-        required=True,
     ),
     RuntimeSettingDefinition(
         "whisper_language",
